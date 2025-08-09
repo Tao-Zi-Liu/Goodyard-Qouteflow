@@ -1,0 +1,68 @@
+
+export type UserRole = 'Admin' | 'Sales' | 'Purchasing';
+export type Language = 'en' | 'de' | 'zh';
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  registrationDate: string;
+  lastLoginTime: string;
+  status: 'Active' | 'Inactive';
+  language: Language;
+  avatar: string; // URL to avatar image
+}
+
+export type RFQStatus = 'Waiting for Quote' | 'Quotation in Progress' | 'Quotation Completed' | 'Archived';
+
+export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee';
+
+export interface Product {
+  id: string;
+  wlid: string;
+  productSeries: ProductSeries;
+  sku: string;
+  hairFiber: string;
+  cap: string;
+  capSize: string;
+  length: string;
+  density: string;
+  color: string;
+  curlStyle: string;
+  images: File[];
+  imagePreviews?: string[];
+}
+
+export interface Quote {
+  rfqId: string;
+  productId: string;
+  purchaserId: string;
+  price: number;
+  deliveryDate: string; // ISO date string
+  quoteTime: string; // ISO date string
+}
+
+export interface RFQ {
+  id: string;
+  code: string;
+  status: RFQStatus;
+  inquiryTime: string; // ISO date string
+  creatorId: string; // Sales user ID
+  assignedPurchaserIds: string[];
+  customerType: string;
+  customerEmail: string;
+  products: Product[];
+  quotes: Quote[];
+  archiveReason?: string;
+}
+
+export interface AppNotification {
+  id: string;
+  titleKey: string;
+  bodyKey: string;
+  bodyParams?: Record<string, string>;
+  createdAt: number;
+  read: boolean;
+  recipientId: string;
+}
