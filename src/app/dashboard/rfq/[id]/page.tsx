@@ -6,36 +6,72 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Trash2, MessageSquare, Paperclip, Send } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, MessageSquare, Paperclip, Send, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useI18n } from '@/hooks/use-i18n';
 import { MOCK_RFQS, MOCK_USERS } from '@/lib/data';
-import type { RFQ, RFQStatus, Product, Quote, User } from '@/lib/types';
+import type { RFQ, RFQStatus, Product, Quote, User, QuoteStatus } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
+import { useToast } from '@/hooks/use-toast';
 
 export default function RFQDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { user } = useAuth();
     const { t } = useI18n();
+    const { toast } = useToast();
+
     const [rfq, setRfq] = useState<RFQ | null>(null);
     const [creator, setCreator] = useState<User | null>(null);
 
     useEffect(() => {
         if (params.id) {
+            // In a real app, you'd fetch this data. Here, we're finding it in the mock data.
+            // A deep copy is needed to prevent direct mutation of mock data.
             const foundRfq = MOCK_RFQS.find(r => r.id === params.id);
             if (foundRfq) {
-                setRfq(foundRfq);
+                setRfq(JSON.parse(JSON.stringify(foundRfq)));
                 const foundCreator = MOCK_USERS.find(u => u.id === foundRfq.creatorId);
                 setCreator(foundCreator || null);
             } else {
-                // Handle RFQ not found, maybe redirect or show a message
+                // Handle RFQ not found
             }
         }
     }, [params.id]);
+
+    const handleAcceptQuote = (productId: string, purchaserId: string) => {
+        if (!rfq) return;
+
+        const updatedRfq = { ...rfq };
+        
+        // Find the accepted quote and update its status
+        const quoteIndex = updatedRfq.quotes.findIndex(q => q.productId === productId && q.purchaserId === purchaserId);
+        if (quoteIndex > -1) {
+            updatedRfq.quotes[quoteIndex].status = 'Accepted';
+        }
+
+        // Mark all other quotes for the same product as no longer primary
+        updatedRfq.quotes.forEach((quote, index) => {
+            if (quote.productId === productId && index !== quoteIndex) {
+                 // Optionally, you could add another status like 'Not Accepted'
+            }
+        });
+        
+        updatedRfq.status = 'Quotation Completed';
+
+        setRfq(updatedRfq);
+        
+        toast({
+            title: "Quote Accepted",
+            description: "The quote has been accepted and the RFQ is now completed.",
+        });
+
+        // Here you would typically save the updated RFQ to your backend.
+        // For this mock, we are just updating the local state.
+    };
     
     const getStatusVariant = (status: RFQStatus) => {
         switch (status) {
@@ -57,7 +93,7 @@ export default function RFQDetailPage() {
         );
     }
 
-    const canEdit = user.role === 'Admin' || user.id === rfq.creatorId;
+    const canEdit = user.role === 'Admin' || (user.id === rfq.creatorId && rfq.status !== 'Quotation Completed');
 
     return (
         <div className="flex flex-col gap-6">
@@ -88,7 +124,7 @@ export default function RFQDetailPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {rfq.products.map(product => (
-                                <ProductDetails key={product.id} product={product} rfq={rfq} />
+                                <ProductDetails key={product.id} product={product} rfq={rfq} onAcceptQuote={handleAcceptQuote} />
                             ))}
                         </CardContent>
                     </Card>
@@ -155,9 +191,12 @@ export default function RFQDetailPage() {
     );
 }
 
-function ProductDetails({ product, rfq }: { product: Product, rfq: RFQ }) {
+function ProductDetails({ product, rfq, onAcceptQuote }: { product: Product, rfq: RFQ, onAcceptQuote: (productId: string, purchaserId: string) => void }) {
+    const { user } = useAuth();
     const { t } = useI18n();
     const quotesForProduct = rfq.quotes.filter(q => q.productId === product.id);
+    const isQuotedByCurrentUser = user && quotesForProduct.some(q => q.purchaserId === user.id);
+    const isProductAccepted = quotesForProduct.some(q => q.status === 'Accepted');
 
     return (
         <div className="border rounded-lg p-4 space-y-4">
@@ -166,7 +205,7 @@ function ProductDetails({ product, rfq }: { product: Product, rfq: RFQ }) {
                     <h3 className="font-semibold">{product.productSeries} - {product.sku}</h3>
                     <p className="text-sm text-muted-foreground">WLID: {product.wlid}</p>
                 </div>
-                {quotesForProduct.length > 0 && <Badge variant="default">Quoted</Badge>}
+                 {isProductAccepted ? <Badge variant="default" className="bg-green-600">Accepted</Badge> : (quotesForProduct.length > 0 && <Badge variant="default">Quoted</Badge>)}
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -192,34 +231,59 @@ function ProductDetails({ product, rfq }: { product: Product, rfq: RFQ }) {
             
             <Separator />
             
-            <QuoteSection quotes={quotesForProduct} />
+            <QuoteSection 
+                quotes={quotesForProduct} 
+                onAcceptQuote={(purchaserId) => onAcceptQuote(product.id, purchaserId)}
+                isProductAccepted={isProductAccepted}
+                isQuotedByCurrentUser={isQuotedByCurrentUser}
+                rfqStatus={rfq.status}
+            />
         </div>
     )
 }
 
-function QuoteSection({ quotes }: { quotes: Quote[] }) {
+function QuoteSection({ quotes, onAcceptQuote, isProductAccepted, isQuotedByCurrentUser, rfqStatus }: { quotes: Quote[], onAcceptQuote: (purchaserId: string) => void, isProductAccepted: boolean, isQuotedByCurrentUser: boolean, rfqStatus: RFQStatus }) {
     const { user } = useAuth();
     const { t } = useI18n();
+
+    const getStatusBadge = (status: QuoteStatus) => {
+        if (status === 'Accepted') {
+            return <Badge variant="default" className="bg-green-600">Accepted</Badge>
+        }
+        return <Badge variant="secondary">Pending</Badge>
+    }
     
     if (user?.role !== 'Purchasing' && quotes.length === 0) {
         return <p className="text-sm text-muted-foreground text-center py-4">Waiting for quotations from purchasing department.</p>;
     }
 
+    const canSubmitQuote = user?.role === 'Purchasing' && !isQuotedByCurrentUser && !isProductAccepted;
+
     return (
         <div className="space-y-4">
             <h4 className="font-semibold text-sm">Quotations</h4>
             {quotes.map(quote => (
-                 <div key={quote.purchaserId} className="bg-muted/50 p-3 rounded-md text-sm">
-                    <div className="flex justify-between">
-                       <span>Quoted by: {MOCK_USERS.find(u => u.id === quote.purchaserId)?.name}</span>
+                 <div key={quote.purchaserId} className={`p-3 rounded-md text-sm ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50 border border-green-500' : 'bg-muted/50'}`}>
+                    <div className="flex justify-between items-center">
+                       <div className="flex items-center gap-2">
+                            <span>Quoted by: {MOCK_USERS.find(u => u.id === quote.purchaserId)?.name}</span>
+                            {getStatusBadge(quote.status)}
+                       </div>
                        <span className="font-bold text-primary">${quote.price.toFixed(2)}</span>
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground mt-1">
                        Delivery: {new Date(quote.deliveryDate).toLocaleDateString()} | Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}
                     </div>
+                    {user?.role === 'Sales' && quote.status === 'Pending Acceptance' && rfqStatus !== 'Quotation Completed' && (
+                        <div className="text-right mt-2">
+                            <Button size="sm" onClick={() => onAcceptQuote(quote.purchaserId)}>
+                                <CheckCircle className="mr-2 h-4 w-4"/> Accept Quote
+                            </Button>
+                        </div>
+                    )}
                  </div>
             ))}
-            {user?.role === 'Purchasing' && (
+            {canSubmitQuote && (
                 <Card className="bg-transparent shadow-none border-dashed">
                     <CardContent className="p-4">
                         <h5 className="font-semibold mb-2 text-center">Submit Your Quote</h5>
@@ -230,6 +294,9 @@ function QuoteSection({ quotes }: { quotes: Quote[] }) {
                     </CardContent>
                 </Card>
             )}
+             {user?.role === 'Purchasing' && isProductAccepted && (
+                 <p className="text-sm text-muted-foreground text-center py-4">A quote for this product has been accepted. No further quotes can be submitted.</p>
+             )}
         </div>
     )
 }

@@ -34,6 +34,8 @@ export interface Product {
   imagePreviews?: string[];
 }
 
+export type QuoteStatus = 'Pending Acceptance' | 'Accepted';
+
 export interface Quote {
   rfqId: string;
   productId: string;
@@ -41,6 +43,7 @@ export interface Quote {
   price: number;
   deliveryDate: string; // ISO date string
   quoteTime: string; // ISO date string
+  status: QuoteStatus;
 }
 
 export interface RFQ {
