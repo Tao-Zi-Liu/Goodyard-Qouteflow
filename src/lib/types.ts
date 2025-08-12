@@ -68,4 +68,5 @@ export interface AppNotification {
   createdAt: number;
   read: boolean;
   recipientId: string;
+  href?: string;
 }

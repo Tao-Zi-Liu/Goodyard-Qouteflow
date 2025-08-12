@@ -4,6 +4,7 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/auth-context';
 import { I18nProvider } from '@/contexts/i18n-context';
 import { Toaster } from '@/components/ui/toaster';
+import { NotificationProvider } from '@/contexts/notification-context';
 
 export const metadata: Metadata = {
   title: 'QuoteFlow',
@@ -25,7 +26,9 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <AuthProvider>
           <I18nProvider>
-            {children}
+            <NotificationProvider>
+              {children}
+            </NotificationProvider>
             <Toaster />
           </I18nProvider>
         </AuthProvider>

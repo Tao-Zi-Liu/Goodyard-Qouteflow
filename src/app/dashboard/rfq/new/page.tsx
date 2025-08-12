@@ -22,6 +22,8 @@ import { rfqFormSchema } from '@/lib/schemas';
 import type { ProductSeries, RFQ } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/use-auth';
+import { useNotifications } from '@/hooks/use-notifications';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -158,7 +160,9 @@ export default function NewRfqPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { toast } = useToast();
-  
+  const { user } = useAuth();
+  const { createNotification } = useNotifications();
+
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [formData, setFormData] = useState<RfqFormValues | null>(null);
 
@@ -200,11 +204,27 @@ export default function NewRfqPage() {
   };
   
   const handleSave = () => {
-     if (!formData) return;
+     if (!formData || !user) return;
+     const newRfqId = `rfq-${Date.now()}`;
+     const newRfqCode = `RFQ-${String(MOCK_RFQS.length + 1).padStart(4, '0')}`;
+     
+     // In a real app, this would be an API call.
+     // Here we are just logging and creating notifications.
      console.log('New RFQ Submitted', formData);
+
+     formData.assignedPurchaserIds.forEach(purchaserId => {
+        createNotification({
+            recipientId: purchaserId,
+            titleKey: 'notification_new_rfq_title',
+            bodyKey: 'notification_new_rfq_body',
+            bodyParams: { rfqCode: newRfqCode, salesName: user.name },
+            href: `/dashboard/rfq/${newRfqId}`, // Faking a new ID for the sake of navigation
+        });
+     });
+
      toast({
        title: "RFQ Created",
-       description: "The new RFQ has been successfully created.",
+       description: "The new RFQ has been successfully created and purchasers have been notified.",
      });
      setIsPreviewOpen(false);
      router.push('/dashboard');
@@ -401,5 +421,3 @@ export default function NewRfqPage() {
     </>
   );
 }
-
-    

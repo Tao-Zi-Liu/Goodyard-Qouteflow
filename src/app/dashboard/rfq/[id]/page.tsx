@@ -23,6 +23,7 @@ import { CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useNotifications } from '@/hooks/use-notifications';
 
 
 export default function RFQDetailPage() {
@@ -31,6 +32,7 @@ export default function RFQDetailPage() {
     const { user } = useAuth();
     const { t } = useI18n();
     const { toast } = useToast();
+    const { createNotification } = useNotifications();
 
     const [rfq, setRfq] = useState<RFQ | null>(null);
     const [creator, setCreator] = useState<User | null>(null);
@@ -85,6 +87,7 @@ export default function RFQDetailPage() {
         if (!rfq || !user) return;
         
         const updatedRfq = {...rfq};
+        const isUpdate = !!existingQuote;
 
         if (existingQuote) {
              const existingQuoteIndex = updatedRfq.quotes.findIndex(q => q.productId === productId && q.purchaserId === user.id);
@@ -110,6 +113,15 @@ export default function RFQDetailPage() {
         
         updatedRfq.status = 'Quotation in Progress';
         setRfq(updatedRfq);
+
+        // Create notification for the salesperson
+        createNotification({
+            recipientId: rfq.creatorId,
+            titleKey: isUpdate ? 'notification_quote_updated_title' : 'notification_quote_submitted_title',
+            bodyKey: isUpdate ? 'notification_quote_updated_body' : 'notification_quote_submitted_body',
+            bodyParams: { rfqCode: rfq.code, purchaserName: user.name },
+            href: `/dashboard/rfq/${rfq.id}`,
+        });
     };
 
 
@@ -428,7 +440,3 @@ function QuoteForm({ trigger, productId, onSubmit, existingQuote }: { trigger: R
         </Popover>
     );
 }
-
-    
-
-    

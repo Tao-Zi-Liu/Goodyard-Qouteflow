@@ -15,7 +15,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
 import { Button } from "@/components/ui/button";
-import { Bell, Workflow } from "lucide-react";
+import { Workflow } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { isAuthenticated, loading, user } = useAuth();
@@ -55,10 +56,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
             <SidebarTrigger className="md:hidden" />
             <div className="flex-1" />
-            <Button variant="ghost" size="icon">
-                <Bell className="h-5 w-5" />
-                <span className="sr-only">Notifications</span>
-            </Button>
+            <NotificationBell />
             <UserNav />
         </header>
         <main className="flex-1 p-4 sm:p-6">
