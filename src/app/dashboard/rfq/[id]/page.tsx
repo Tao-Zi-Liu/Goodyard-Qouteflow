@@ -81,32 +81,33 @@ export default function RFQDetailPage() {
         // For this mock, we are just updating the local state.
     };
     
-    const handleQuoteSubmit = (productId: string, price: number, deliveryDate: Date) => {
+    const handleQuoteSubmit = (productId: string, price: number, deliveryDate: Date, existingQuote?: Quote) => {
         if (!rfq || !user) return;
         
         const updatedRfq = {...rfq};
-        const quote: Quote = {
-            rfqId: rfq.id,
-            productId,
-            purchaserId: user.id,
-            price,
-            deliveryDate: deliveryDate.toISOString(),
-            quoteTime: new Date().toISOString(),
-            status: 'Pending Acceptance'
-        };
 
-        const existingQuoteIndex = updatedRfq.quotes.findIndex(q => q.productId === productId && q.purchaserId === user.id);
-
-        if (existingQuoteIndex > -1) {
-            // Update existing quote
-            updatedRfq.quotes[existingQuoteIndex] = quote;
-             toast({ title: "Quote Updated", description: "Your quote has been successfully updated."});
+        if (existingQuote) {
+             const existingQuoteIndex = updatedRfq.quotes.findIndex(q => q.productId === productId && q.purchaserId === user.id);
+             if (existingQuoteIndex > -1) {
+                const quoteToUpdate = updatedRfq.quotes[existingQuoteIndex];
+                quoteToUpdate.price = price;
+                quoteToUpdate.deliveryDate = deliveryDate.toISOString();
+                toast({ title: "Quote Updated", description: "Your quote has been successfully updated."});
+             }
         } else {
-            // Add new quote
-            updatedRfq.quotes.push(quote);
-             toast({ title: "Quote Submitted", description: "Your quote has been successfully submitted."});
+            const newQuote: Quote = {
+                rfqId: rfq.id,
+                productId,
+                purchaserId: user.id,
+                price,
+                deliveryDate: deliveryDate.toISOString(),
+                quoteTime: new Date().toISOString(),
+                status: 'Pending Acceptance'
+            };
+            updatedRfq.quotes.push(newQuote);
+            toast({ title: "Quote Submitted", description: "Your quote has been successfully submitted."});
         }
-
+        
         updatedRfq.status = 'Quotation in Progress';
         setRfq(updatedRfq);
     };
@@ -236,11 +237,11 @@ export default function RFQDetailPage() {
     );
 }
 
-function ProductDetails({ product, rfq, onAcceptQuote, onQuoteSubmit }: { product: Product, rfq: RFQ, onAcceptQuote: (productId: string, purchaserId: string) => void, onQuoteSubmit: (productId: string, price: number, deliveryDate: Date) => void }) {
+function ProductDetails({ product, rfq, onAcceptQuote, onQuoteSubmit }: { product: Product, rfq: RFQ, onAcceptQuote: (productId: string, purchaserId: string) => void, onQuoteSubmit: (productId: string, price: number, deliveryDate: Date, existingQuote?: Quote) => void }) {
     const { user } = useAuth();
     const { t } = useI18n();
     const quotesForProduct = rfq.quotes.filter(q => q.productId === product.id);
-    const isQuotedByCurrentUser = user && quotesForProduct.some(q => q.purchaserId === user.id);
+    const isQuotedByCurrentUser = user && rfq.assignedPurchaserIds.includes(user.id) && quotesForProduct.some(q => q.purchaserId === user.id);
     const isProductAccepted = quotesForProduct.some(q => q.status === 'Accepted');
 
     return (
@@ -289,7 +290,7 @@ function ProductDetails({ product, rfq, onAcceptQuote, onQuoteSubmit }: { produc
     )
 }
 
-function QuoteSection({ quotes, productId, onAcceptQuote, onQuoteSubmit, isProductAccepted, isQuotedByCurrentUser, rfqStatus }: { quotes: Quote[], productId: string, onAcceptQuote: (purchaserId: string) => void, onQuoteSubmit: (productId: string, price: number, deliveryDate: Date) => void, isProductAccepted: boolean, isQuotedByCurrentUser: boolean, rfqStatus: RFQStatus }) {
+function QuoteSection({ quotes, productId, onAcceptQuote, onQuoteSubmit, isProductAccepted, isQuotedByCurrentUser, rfqStatus }: { quotes: Quote[], productId: string, onAcceptQuote: (purchaserId: string) => void, onQuoteSubmit: (productId: string, price: number, deliveryDate: Date, existingQuote?: Quote) => void, isProductAccepted: boolean, isQuotedByCurrentUser: boolean, rfqStatus: RFQStatus }) {
     const { user } = useAuth();
     const { t } = useI18n();
 
@@ -359,7 +360,7 @@ function QuoteSection({ quotes, productId, onAcceptQuote, onQuoteSubmit, isProdu
     )
 }
 
-function QuoteForm({ trigger, productId, onSubmit, existingQuote }: { trigger: React.ReactNode, productId: string, onSubmit: (productId: string, price: number, deliveryDate: Date) => void, existingQuote?: Quote }) {
+function QuoteForm({ trigger, productId, onSubmit, existingQuote }: { trigger: React.ReactNode, productId: string, onSubmit: (productId: string, price: number, deliveryDate: Date, existingQuote?: Quote) => void, existingQuote?: Quote }) {
     const [open, setOpen] = useState(false);
     const [price, setPrice] = useState(existingQuote?.price || '');
     const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(existingQuote ? new Date(existingQuote.deliveryDate) : undefined);
@@ -367,7 +368,7 @@ function QuoteForm({ trigger, productId, onSubmit, existingQuote }: { trigger: R
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (price && deliveryDate) {
-            onSubmit(productId, Number(price), deliveryDate);
+            onSubmit(productId, Number(price), deliveryDate, existingQuote);
             setOpen(false);
         }
     }
@@ -427,5 +428,7 @@ function QuoteForm({ trigger, productId, onSubmit, existingQuote }: { trigger: R
         </Popover>
     );
 }
+
+    
 
     
