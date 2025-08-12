@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Plus, Trash2, Upload } from 'lucide-react';
@@ -14,46 +14,171 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
-import { useAuth } from '@/hooks/use-auth';
 import { useI18n } from '@/hooks/use-i18n';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_USERS } from '@/lib/data';
+import { MOCK_USERS, MOCK_RFQS } from '@/lib/data';
 import { rfqFormSchema } from '@/lib/schemas';
-import type { ProductSeries, User } from '@/lib/types';
+import type { ProductSeries, RFQ } from '@/lib/types';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
 const productSeriesOptions: ProductSeries[] = ['Wig', 'Hair Extension', 'Topper', 'Toupee', 'Synthetic Product'];
 
+const wlidPrefixMap: Record<ProductSeries, string> = {
+    'Wig': 'FTCV',
+    'Hair Extension': 'FTCE',
+    'Topper': 'FTCP',
+    'Toupee': 'FTCU',
+    'Synthetic Product': 'FTCS',
+};
+
+const generateWlid = (productSeries: ProductSeries): string => {
+    const prefix = wlidPrefixMap[productSeries];
+    let maxSuffix = 0;
+
+    MOCK_RFQS.forEach(rfq => {
+        rfq.products.forEach(product => {
+            if (product.wlid.startsWith(prefix)) {
+                const suffix = parseInt(product.wlid.substring(prefix.length), 10);
+                if (suffix > maxSuffix) {
+                    maxSuffix = suffix;
+                }
+            }
+        });
+    });
+
+    const newSuffix = (maxSuffix + 1).toString().padStart(4, '0');
+    return `${prefix}${newSuffix}`;
+};
+
+
+function ProductRow({ index, control, remove }: { index: number, control: any, remove: (index: number) => void }) {
+    const { setValue } = useFormContext<RfqFormValues>();
+    const productSeries = useWatch({
+        control,
+        name: `products.${index}.productSeries`,
+    });
+
+    useEffect(() => {
+        if (productSeries) {
+            const newWlid = generateWlid(productSeries);
+            setValue(`products.${index}.wlid`, newWlid, { shouldValidate: true, shouldDirty: true });
+        }
+    }, [productSeries, index, setValue]);
+
+    return (
+        <div className="border rounded-lg p-4 space-y-4 relative">
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                onClick={() => remove(index)}
+            >
+                <Trash2 className="h-4 w-4" />
+            </Button>
+            <div className="grid sm:grid-cols-2 gap-4">
+                <FormField control={control} name={`products.${index}.wlid`} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WLID</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly className="bg-muted/50" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={control} name={`products.${index}.sku`} render={({ field }) => (
+                  <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+            </div>
+             <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Series</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
+                <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={control} name={`products.${index}.cap`} render={({ field }) => (
+                 <FormItem><FormLabel>Cap</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.capSize`} render={({ field }) => (
+                 <FormItem><FormLabel>Cap Size</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.length`} render={({ field }) => (
+                 <FormItem><FormLabel>Length</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.density`} render={({ field }) => (
+                 <FormItem><FormLabel>Density</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.color`} render={({ field }) => (
+                 <FormItem><FormLabel>Color</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.curlStyle`} render={({ field }) => (
+                 <FormItem><FormLabel>Curls</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+            <FormField control={control} name={`products.${index}.images`} render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Images</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center justify-center w-full">
+                          <label htmlFor={`dropzone-file-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
+                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                  <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
+                                  <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                  <p className="text-xs text-muted-foreground">PNG, JPG or GIF (MAX. 800x400px)</p>
+                              </div>
+                              <Input id={`dropzone-file-${index}`} type="file" className="hidden" multiple onChange={(e) => field.onChange(Array.from(e.target.files || []))} />
+                          </label>
+                      </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+        </div>
+    );
+}
+
+
 export default function NewRfqPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useI18n();
   const { toast } = useToast();
   
   const purchasingUsers = MOCK_USERS.filter(u => u.role === 'Purchasing');
 
+  const defaultProductSeries: ProductSeries = 'Wig';
+  const defaultValues = {
+    customerType: 'New',
+    customerEmail: '',
+    assignedPurchaserIds: [],
+    products: [{
+      wlid: generateWlid(defaultProductSeries),
+      productSeries: defaultProductSeries,
+      sku: '',
+      hairFiber: '',
+      cap: '',
+      capSize: '',
+      length: '',
+      density: '',
+      color: '',
+      curlStyle: '',
+      images: [],
+    }],
+  };
+  
   const form = useForm<RfqFormValues>({
     resolver: zodResolver(rfqFormSchema),
-    defaultValues: {
-      customerType: 'New',
-      customerEmail: '',
-      assignedPurchaserIds: [],
-      products: [{
-        wlid: '',
-        productSeries: 'Wig',
-        sku: '',
-        hairFiber: '',
-        cap: '',
-        capSize: '',
-        length: '',
-        density: '',
-        color: '',
-        curlStyle: '',
-        images: [],
-      }],
-    },
+    defaultValues,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -69,6 +194,23 @@ export default function NewRfqPage() {
     });
     router.push('/dashboard');
   };
+
+  const addProduct = () => {
+    const newProductSeries: ProductSeries = 'Wig';
+    append({
+        wlid: generateWlid(newProductSeries),
+        productSeries: newProductSeries,
+        sku: '',
+        hairFiber: '',
+        cap: '',
+        capSize: '',
+        length: '',
+        density: '',
+        color: '',
+        curlStyle: '',
+        images: []
+    });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -92,83 +234,9 @@ export default function NewRfqPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {fields.map((field, index) => (
-                    <div key={field.id} className="border rounded-lg p-4 space-y-4 relative">
-                       {fields.length > 1 && (
-                         <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
-                            onClick={() => remove(index)}
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                       )}
-                      <div className="grid sm:grid-cols-2 gap-4">
-                        <FormField control={form.control} name={`products.${index}.wlid`} render={({ field }) => (
-                          <FormItem><FormLabel>WLID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name={`products.${index}.sku`} render={({ field }) => (
-                          <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                      </div>
-                       <FormField control={form.control} name={`products.${index}.productSeries`} render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Product Series</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                              <SelectContent>
-                                {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        <FormField control={form.control} name={`products.${index}.hairFiber`} render={({ field }) => (
-                          <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <FormField control={form.control} name={`products.${index}.cap`} render={({ field }) => (
-                           <FormItem><FormLabel>Cap</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                         <FormField control={form.control} name={`products.${index}.capSize`} render={({ field }) => (
-                           <FormItem><FormLabel>Cap Size</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                         <FormField control={form.control} name={`products.${index}.length`} render={({ field }) => (
-                           <FormItem><FormLabel>Length</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                         <FormField control={form.control} name={`products.${index}.density`} render={({ field }) => (
-                           <FormItem><FormLabel>Density</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                         <FormField control={form.control} name={`products.${index}.color`} render={({ field }) => (
-                           <FormItem><FormLabel>Color</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                         <FormField control={form.control} name={`products.${index}.curlStyle`} render={({ field }) => (
-                           <FormItem><FormLabel>Curls</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                      </div>
-                      <FormField control={form.control} name={`products.${index}.images`} render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Images</FormLabel>
-                              <FormControl>
-                                <div className="flex items-center justify-center w-full">
-                                    <label htmlFor={`dropzone-file-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                            <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
-                                            <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                            <p className="text-xs text-muted-foreground">PNG, JPG or GIF (MAX. 800x400px)</p>
-                                        </div>
-                                        <Input id={`dropzone-file-${index}`} type="file" className="hidden" multiple onChange={(e) => field.onChange(Array.from(e.target.files || []))} />
-                                    </label>
-                                </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-
-                    </div>
+                    <ProductRow key={field.id} index={index} control={form.control} remove={remove} />
                   ))}
-                  <Button type="button" variant="outline" onClick={() => append({ wlid: '', productSeries: 'Wig', sku: '', hairFiber: '', cap: '', capSize: '', length: '', density: '', color: '', curlStyle: '', images: [] })}>
+                  <Button type="button" variant="outline" onClick={addProduct}>
                     <Plus className="mr-2 h-4 w-4" /> Add Another Product
                   </Button>
                 </CardContent>
@@ -254,3 +322,4 @@ export default function NewRfqPage() {
     </div>
   );
 }
+
