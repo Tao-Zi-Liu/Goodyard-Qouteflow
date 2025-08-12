@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/use-auth';
 import { useI18n } from '@/hooks/use-i18n';
@@ -202,18 +203,44 @@ export default function NewRfqPage() {
                   <CardTitle>Assign Purchaser</CardTitle>
                 </CardHeader>
                  <CardContent>
-                   <FormField control={form.control} name="assignedPurchaserIds" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Select Purchasers</FormLabel>
-                        <Select onValueChange={(value) => field.onChange([value])}>
-                           <FormControl><SelectTrigger><SelectValue placeholder="Select a purchaser" /></SelectTrigger></FormControl>
-                          <SelectContent>
-                            {purchasingUsers.map(pUser => <SelectItem key={pUser.id} value={pUser.id}>{pUser.name}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
+                    <FormField
+                        control={form.control}
+                        name="assignedPurchaserIds"
+                        render={() => (
+                            <FormItem>
+                                <FormLabel>Select Purchasers</FormLabel>
+                                <div className="space-y-2">
+                                    {purchasingUsers.map((pUser) => (
+                                        <FormField
+                                            key={pUser.id}
+                                            control={form.control}
+                                            name="assignedPurchaserIds"
+                                            render={({ field }) => {
+                                                return (
+                                                    <FormItem key={pUser.id} className="flex flex-row items-start space-x-3 space-y-0">
+                                                        <FormControl>
+                                                            <Checkbox
+                                                                checked={field.value?.includes(pUser.id)}
+                                                                onCheckedChange={(checked) => {
+                                                                    return checked
+                                                                        ? field.onChange([...field.value, pUser.id])
+                                                                        : field.onChange(field.value?.filter((value) => value !== pUser.id));
+                                                                }}
+                                                            />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal">
+                                                            {pUser.name}
+                                                        </FormLabel>
+                                                    </FormItem>
+                                                );
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
                 </CardContent>
               </Card>
             </div>
