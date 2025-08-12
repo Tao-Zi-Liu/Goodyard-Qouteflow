@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Edit, Trash2, MessageSquare, Paperclip, Send, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, MessageSquare, Paperclip, Send, CheckCircle, Pencil } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useI18n } from '@/hooks/use-i18n';
 import { MOCK_RFQS, MOCK_USERS } from '@/lib/data';
@@ -16,6 +16,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+
 
 export default function RFQDetailPage() {
     const params = useParams();
@@ -73,6 +81,37 @@ export default function RFQDetailPage() {
         // For this mock, we are just updating the local state.
     };
     
+    const handleQuoteSubmit = (productId: string, price: number, deliveryDate: Date) => {
+        if (!rfq || !user) return;
+        
+        const updatedRfq = {...rfq};
+        const quote: Quote = {
+            rfqId: rfq.id,
+            productId,
+            purchaserId: user.id,
+            price,
+            deliveryDate: deliveryDate.toISOString(),
+            quoteTime: new Date().toISOString(),
+            status: 'Pending Acceptance'
+        };
+
+        const existingQuoteIndex = updatedRfq.quotes.findIndex(q => q.productId === productId && q.purchaserId === user.id);
+
+        if (existingQuoteIndex > -1) {
+            // Update existing quote
+            updatedRfq.quotes[existingQuoteIndex] = quote;
+             toast({ title: "Quote Updated", description: "Your quote has been successfully updated."});
+        } else {
+            // Add new quote
+            updatedRfq.quotes.push(quote);
+             toast({ title: "Quote Submitted", description: "Your quote has been successfully submitted."});
+        }
+
+        updatedRfq.status = 'Quotation in Progress';
+        setRfq(updatedRfq);
+    };
+
+
     const getStatusVariant = (status: RFQStatus) => {
         switch (status) {
             case 'Waiting for Quote': return 'secondary';
@@ -124,7 +163,13 @@ export default function RFQDetailPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {rfq.products.map(product => (
-                                <ProductDetails key={product.id} product={product} rfq={rfq} onAcceptQuote={handleAcceptQuote} />
+                                <ProductDetails 
+                                    key={product.id} 
+                                    product={product} 
+                                    rfq={rfq} 
+                                    onAcceptQuote={handleAcceptQuote} 
+                                    onQuoteSubmit={handleQuoteSubmit}
+                                />
                             ))}
                         </CardContent>
                     </Card>
@@ -191,7 +236,7 @@ export default function RFQDetailPage() {
     );
 }
 
-function ProductDetails({ product, rfq, onAcceptQuote }: { product: Product, rfq: RFQ, onAcceptQuote: (productId: string, purchaserId: string) => void }) {
+function ProductDetails({ product, rfq, onAcceptQuote, onQuoteSubmit }: { product: Product, rfq: RFQ, onAcceptQuote: (productId: string, purchaserId: string) => void, onQuoteSubmit: (productId: string, price: number, deliveryDate: Date) => void }) {
     const { user } = useAuth();
     const { t } = useI18n();
     const quotesForProduct = rfq.quotes.filter(q => q.productId === product.id);
@@ -232,8 +277,10 @@ function ProductDetails({ product, rfq, onAcceptQuote }: { product: Product, rfq
             <Separator />
             
             <QuoteSection 
-                quotes={quotesForProduct} 
+                quotes={quotesForProduct}
+                productId={product.id}
                 onAcceptQuote={(purchaserId) => onAcceptQuote(product.id, purchaserId)}
+                onQuoteSubmit={onQuoteSubmit}
                 isProductAccepted={isProductAccepted}
                 isQuotedByCurrentUser={isQuotedByCurrentUser}
                 rfqStatus={rfq.status}
@@ -242,7 +289,7 @@ function ProductDetails({ product, rfq, onAcceptQuote }: { product: Product, rfq
     )
 }
 
-function QuoteSection({ quotes, onAcceptQuote, isProductAccepted, isQuotedByCurrentUser, rfqStatus }: { quotes: Quote[], onAcceptQuote: (purchaserId: string) => void, isProductAccepted: boolean, isQuotedByCurrentUser: boolean, rfqStatus: RFQStatus }) {
+function QuoteSection({ quotes, productId, onAcceptQuote, onQuoteSubmit, isProductAccepted, isQuotedByCurrentUser, rfqStatus }: { quotes: Quote[], productId: string, onAcceptQuote: (purchaserId: string) => void, onQuoteSubmit: (productId: string, price: number, deliveryDate: Date) => void, isProductAccepted: boolean, isQuotedByCurrentUser: boolean, rfqStatus: RFQStatus }) {
     const { user } = useAuth();
     const { t } = useI18n();
 
@@ -256,7 +303,7 @@ function QuoteSection({ quotes, onAcceptQuote, isProductAccepted, isQuotedByCurr
     if (user?.role !== 'Purchasing' && quotes.length === 0) {
         return <p className="text-sm text-muted-foreground text-center py-4">Waiting for quotations from purchasing department.</p>;
     }
-
+    
     const canSubmitQuote = user?.role === 'Purchasing' && !isQuotedByCurrentUser && !isProductAccepted;
 
     return (
@@ -269,7 +316,17 @@ function QuoteSection({ quotes, onAcceptQuote, isProductAccepted, isQuotedByCurr
                             <span>Quoted by: {MOCK_USERS.find(u => u.id === quote.purchaserId)?.name}</span>
                             {getStatusBadge(quote.status)}
                        </div>
-                       <span className="font-bold text-primary">${quote.price.toFixed(2)}</span>
+                       <div className="flex items-center gap-2">
+                           <span className="font-bold text-primary">${quote.price.toFixed(2)}</span>
+                           {user?.id === quote.purchaserId && quote.status === 'Pending Acceptance' && !isProductAccepted && (
+                               <QuoteForm
+                                   trigger={<Button variant="ghost" size="icon" className="h-6 w-6"><Pencil className="h-4 w-4"/></Button>}
+                                   productId={productId}
+                                   onSubmit={onQuoteSubmit}
+                                   existingQuote={quote}
+                               />
+                           )}
+                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
                        Delivery: {new Date(quote.deliveryDate).toLocaleDateString()} | Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}
@@ -287,10 +344,11 @@ function QuoteSection({ quotes, onAcceptQuote, isProductAccepted, isQuotedByCurr
                 <Card className="bg-transparent shadow-none border-dashed">
                     <CardContent className="p-4">
                         <h5 className="font-semibold mb-2 text-center">Submit Your Quote</h5>
-                        <form className="space-y-2">
-                             {/* Form fields for price and delivery would go here */}
-                             <Button className="w-full">Submit Quote</Button>
-                        </form>
+                        <QuoteForm
+                           trigger={<Button className="w-full">Submit Quote</Button>}
+                           productId={productId}
+                           onSubmit={onQuoteSubmit}
+                       />
                     </CardContent>
                 </Card>
             )}
@@ -300,3 +358,74 @@ function QuoteSection({ quotes, onAcceptQuote, isProductAccepted, isQuotedByCurr
         </div>
     )
 }
+
+function QuoteForm({ trigger, productId, onSubmit, existingQuote }: { trigger: React.ReactNode, productId: string, onSubmit: (productId: string, price: number, deliveryDate: Date) => void, existingQuote?: Quote }) {
+    const [open, setOpen] = useState(false);
+    const [price, setPrice] = useState(existingQuote?.price || '');
+    const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(existingQuote ? new Date(existingQuote.deliveryDate) : undefined);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (price && deliveryDate) {
+            onSubmit(productId, Number(price), deliveryDate);
+            setOpen(false);
+        }
+    }
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent className="w-80">
+                <form onSubmit={handleSubmit} className="grid gap-4">
+                    <div className="space-y-2">
+                        <h4 className="font-medium leading-none">{existingQuote ? 'Edit Quote' : 'Submit Quote'}</h4>
+                        <p className="text-sm text-muted-foreground">
+                            Enter the price and estimated delivery date.
+                        </p>
+                    </div>
+                    <div className="grid gap-2">
+                        <div className="grid grid-cols-3 items-center gap-4">
+                            <Label htmlFor="price">Price</Label>
+                            <Input
+                                id="price"
+                                type="number"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                className="col-span-2 h-8"
+                                required
+                            />
+                        </div>
+                        <div className="grid grid-cols-3 items-center gap-4">
+                            <Label htmlFor="deliveryDate">Delivery</Label>
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant={"outline"}
+                                    className={cn(
+                                      "col-span-2 h-8 justify-start text-left font-normal",
+                                      !deliveryDate && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {deliveryDate ? format(deliveryDate, "PPP") : <span>Pick a date</span>}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                  <Calendar
+                                    mode="single"
+                                    selected={deliveryDate}
+                                    onSelect={setDeliveryDate}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                        </div>
+                    </div>
+                    <Button type="submit">{existingQuote ? 'Update' : 'Submit'}</Button>
+                </form>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+    
