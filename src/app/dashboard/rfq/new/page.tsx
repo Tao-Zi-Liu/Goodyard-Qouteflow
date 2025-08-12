@@ -77,6 +77,18 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
             >
                 <Trash2 className="h-4 w-4" />
             </Button>
+            <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
+              <FormItem>
+                <FormLabel>Product Series</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                  <SelectContent>
+                    {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
             <div className="grid sm:grid-cols-2 gap-4">
                 <FormField control={control} name={`products.${index}.wlid`} render={({ field }) => (
                   <FormItem>
@@ -91,18 +103,6 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
                   <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
-             <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Series</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
               <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
                 <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -322,5 +322,3 @@ export default function NewRfqPage() {
     </div>
   );
 }
-
-    
