@@ -42,18 +42,16 @@ export function MainNav({ userRole }: MainNavProps) {
             {menuItems.map((item) => (
                 item.roles.includes(userRole!) && (
                 <SidebarMenuItem key={item.href}>
-                    <Link href={item.href} passHref>
-                        <SidebarMenuButton 
-                            asChild
-                            isActive={pathname === item.href}
-                            tooltip={{ children: t(item.labelKey) }}
-                        >
-                            <Link href={item.href}>
-                                <item.icon />
-                                <span>{t(item.labelKey)}</span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </Link>
+                    <SidebarMenuButton 
+                        asChild
+                        isActive={pathname === item.href}
+                        tooltip={{ children: t(item.labelKey) }}
+                    >
+                        <Link href={item.href}>
+                            <item.icon />
+                            <span>{t(item.labelKey)}</span>
+                        </Link>
+                    </SidebarMenuButton>
                 </SidebarMenuItem>
                 )
             ))}
