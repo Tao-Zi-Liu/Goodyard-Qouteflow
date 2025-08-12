@@ -135,7 +135,7 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
                               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                   <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
                                   <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                  <p className="text-xs text-muted-foreground">PNG, JPG or GIF (MAX. 800x400px)</p>
+                                  <p className="text-xs text-muted-foreground">Each image is limited to 3M, and a maximum of 5 images can be uploaded</p>
                               </div>
                               <Input id={`dropzone-file-${index}`} type="file" className="hidden" multiple onChange={(e) => field.onChange(Array.from(e.target.files || []))} />
                           </label>
