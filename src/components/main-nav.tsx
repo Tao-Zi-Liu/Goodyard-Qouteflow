@@ -29,6 +29,12 @@ export function MainNav({ userRole }: MainNavProps) {
       roles: ['Sales'],
     },
     {
+      href: '/dashboard/purchasing-stats',
+      labelKey: 'purchasing_statistics_title',
+      icon: BarChart3,
+      roles: ['Purchasing'],
+    },
+    {
       href: '/dashboard/users',
       labelKey: 'user_management_title',
       icon: Users,
