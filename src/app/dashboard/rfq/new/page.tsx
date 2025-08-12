@@ -103,7 +103,7 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
                   <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="space-y-4">
               <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
                 <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
