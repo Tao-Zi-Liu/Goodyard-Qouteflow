@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import type { UserRole } from '@/lib/types';
 import { useI18n } from '@/hooks/use-i18n';
-import { LayoutDashboard, Users, Trash2, FileText, ShoppingCart } from 'lucide-react';
+import { LayoutDashboard, Users, Trash2, BarChart3 } from 'lucide-react';
 
 interface MainNavProps {
     userRole: UserRole | undefined;
@@ -21,6 +21,12 @@ export function MainNav({ userRole }: MainNavProps) {
       labelKey: 'dashboard_title',
       icon: LayoutDashboard,
       roles: ['Admin', 'Sales', 'Purchasing'],
+    },
+    {
+      href: '/dashboard/sales-stats',
+      labelKey: 'sales_statistics_title',
+      icon: BarChart3,
+      roles: ['Sales'],
     },
     {
       href: '/dashboard/users',
@@ -43,14 +49,13 @@ export function MainNav({ userRole }: MainNavProps) {
                 item.roles.includes(userRole!) && (
                 <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton 
-                        asChild
+                        href={item.href}
+                        as={Link}
                         isActive={pathname === item.href}
                         tooltip={{ children: t(item.labelKey) }}
                     >
-                        <Link href={item.href}>
-                            <item.icon />
-                            <span>{t(item.labelKey)}</span>
-                        </Link>
+                        <item.icon />
+                        <span>{t(item.labelKey)}</span>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
                 )
