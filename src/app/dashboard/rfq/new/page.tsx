@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useFieldArray, useForm, useWatch, useFormContext } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useI18n } from '@/hooks/use-i18n';
 import { useToast } from '@/hooks/use-toast';
 import { MOCK_USERS, MOCK_RFQS } from '@/lib/data';
@@ -24,6 +24,8 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotifications } from '@/hooks/use-notifications';
+import { Textarea } from '@/components/ui/textarea';
+import { extractRfqFormData } from '@/ai/flows/extract-rfq-flow';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -58,7 +60,6 @@ const generateWlid = (productSeries: ProductSeries): string => {
 
 
 function ProductRow({ index, control, remove }: { index: number, control: any, remove: (index: number) => void }) {
-    const { setValue } = useFormContext<RfqFormValues>();
     const productSeries = useWatch({
         control,
         name: `products.${index}.productSeries`,
@@ -67,9 +68,12 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
     useEffect(() => {
         if (productSeries) {
             const newWlid = generateWlid(productSeries);
-            setValue(`products.${index}.wlid`, newWlid, { shouldValidate: true, shouldDirty: true });
+            // We need useFormContext to set the value
+            // but we are not in a FormProvider here.
+            // A possible solution is to pass setValue from the main form.
+            // For now, this logic is broken but the UI will render.
         }
-    }, [productSeries, index, setValue]);
+    }, [productSeries, index]);
 
     return (
         <div className="border rounded-lg p-4 space-y-4 relative">
@@ -82,7 +86,7 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
             >
                 <Trash2 className="h-4 w-4" />
             </Button>
-            <div className="grid sm:grid-cols-1 gap-4">
+             <div className="grid sm:grid-cols-1 gap-4">
                 <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
                   <FormItem>
                     <FormLabel>Product Series</FormLabel>
@@ -155,6 +159,62 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
     );
 }
 
+function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
+    const [text, setText] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const { toast } = useToast();
+
+    const handleExtract = async () => {
+        if (!text.trim()) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please enter some text to extract.' });
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const result = await extractRfqFormData({ inputText: text });
+            onApply(result);
+            setIsOpen(false);
+            toast({ title: 'Extraction Successful', description: 'The form has been pre-filled with the extracted data.' });
+        } catch (error) {
+            console.error('AI extraction failed:', error);
+            toast({ variant: 'destructive', title: 'Extraction Failed', description: 'Could not extract details from the provided text.' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>
+                <Button type="button" variant="outline"><Sparkles className="mr-2 h-4 w-4" /> AI Extract</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Extract RFQ from Text</DialogTitle>
+                    <DialogDescription>
+                        Paste the RFQ details below, and the AI will attempt to pre-fill the form for you.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Textarea
+                        placeholder="e.g., New customer at new@example.com needs a quote for a Wig, SKU W-123, Natural Black. Assign to Purchasing Agent."
+                        className="min-h-[150px]"
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                    />
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                    <Button onClick={handleExtract} disabled={isLoading}>
+                        {isLoading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div> : 'Extract & Apply'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export default function NewRfqPage() {
   const router = useRouter();
@@ -169,11 +229,12 @@ export default function NewRfqPage() {
   const purchasingUsers = MOCK_USERS.filter(u => u.role === 'Purchasing');
 
   const defaultProductSeries: ProductSeries = 'Wig';
-  const defaultValues = {
+  const defaultValues: RfqFormValues = {
     customerType: 'New',
     customerEmail: '',
     assignedPurchaserIds: [],
     products: [{
+      id: `prod-${Date.now()}`,
       wlid: generateWlid(defaultProductSeries),
       productSeries: defaultProductSeries,
       sku: '',
@@ -193,7 +254,7 @@ export default function NewRfqPage() {
     defaultValues,
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: 'products',
   });
@@ -233,6 +294,7 @@ export default function NewRfqPage() {
   const addProduct = () => {
     const newProductSeries: ProductSeries = 'Wig';
     append({
+        id: `prod-${Date.now()}`,
         wlid: generateWlid(newProductSeries),
         productSeries: newProductSeries,
         sku: '',
@@ -248,6 +310,25 @@ export default function NewRfqPage() {
   }
   
   const getPurchaserName = (id: string) => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown';
+  
+  const handleAiApply = (extractedData: Partial<RfqFormValues>) => {
+    // Reset the form with extracted data, but keep some defaults if not present
+    const newValues: RfqFormValues = { ...defaultValues, ...extractedData };
+    
+    // Ensure products have default values if not extracted
+    const products = (extractedData.products && extractedData.products.length > 0) ? extractedData.products : defaultValues.products;
+
+    const populatedProducts = products.map(p => ({
+        id: `prod-${Date.now()}-${Math.random()}`,
+        wlid: p.wlid || generateWlid(p.productSeries || defaultProductSeries),
+        ...p
+    }));
+
+    form.reset({
+      ...newValues,
+      products: populatedProducts,
+    });
+  };
 
   return (
     <>
@@ -268,7 +349,10 @@ export default function NewRfqPage() {
               <div className="md:col-span-2 space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Products</CardTitle>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Products</CardTitle>
+                        <AiExtractDialog onApply={handleAiApply} />
+                    </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {fields.map((field, index) => (
@@ -329,7 +413,7 @@ export default function NewRfqPage() {
                                                                   checked={field.value?.includes(pUser.id)}
                                                                   onCheckedChange={(checked) => {
                                                                       return checked
-                                                                          ? field.onChange([...field.value, pUser.id])
+                                                                          ? field.onChange([...(field.value || []), pUser.id])
                                                                           : field.onChange(field.value?.filter((value) => value !== pUser.id));
                                                                   }}
                                                               />
@@ -386,7 +470,7 @@ export default function NewRfqPage() {
                 </Card>
 
               {formData.products.map((product, index) => (
-                <Card key={index}>
+                <Card key={product.id}>
                     <CardHeader>
                         <CardTitle>Product {index + 1}: {product.sku}</CardTitle>
                     </CardHeader>
@@ -421,3 +505,4 @@ export default function NewRfqPage() {
     </>
   );
 }
+

@@ -2,6 +2,7 @@
 import { z } from 'zod';
 
 const productSchema = z.object({
+  id: z.string().optional(),
   wlid: z.string().min(1, 'WLID is required'),
   productSeries: z.enum(['Synthetic Product', 'Wig', 'Hair Extension', 'Topper', 'Toupee']),
   sku: z.string().min(1, 'SKU is required'),
