@@ -1,12 +1,13 @@
 
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save, Sparkles, AlertCircle } from 'lucide-react';
+import { debounce } from 'lodash';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,13 +20,15 @@ import { useI18n } from '@/hooks/use-i18n';
 import { useToast } from '@/hooks/use-toast';
 import { MOCK_USERS, MOCK_RFQS } from '@/lib/data';
 import { rfqFormSchema } from '@/lib/schemas';
-import type { ProductSeries, RFQ } from '@/lib/types';
+import type { ProductSeries, RFQ, Product, Quote } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Textarea } from '@/components/ui/textarea';
 import { extractRfqFormData } from '@/ai/flows/extract-rfq-flow';
+import { findSimilarQuotes } from '@/ai/flows/find-similar-quotes-flow';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -59,21 +62,44 @@ const generateWlid = (productSeries: ProductSeries): string => {
 };
 
 
-function ProductRow({ index, control, remove }: { index: number, control: any, remove: (index: number) => void }) {
-    const productSeries = useWatch({
+function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: { index: number, control: any, remove: (index: number) => void, setValue: any, onSimilarQuotesFound: (quotes: Quote[]) => void }) {
+    const productData = useWatch({
         control,
-        name: `products.${index}.productSeries`,
+        name: `products.${index}`,
     });
 
+    const debouncedFindQuotes = useMemo(
+        () =>
+            debounce(async (product: Product) => {
+                if (!product.productSeries) return;
+                
+                const filledFields = Object.values(product).filter(v => v && typeof v === 'string').length;
+                if (filledFields < 6) return;
+
+                try {
+                    const similarQuotes = await findSimilarQuotes(product);
+                    if (similarQuotes.length > 0) {
+                        onSimilarQuotesFound(similarQuotes);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch similar quotes:", error);
+                }
+            }, 1000),
+        [onSimilarQuotesFound]
+    );
+
     useEffect(() => {
-        if (productSeries) {
-            const newWlid = generateWlid(productSeries);
-            // We need useFormContext to set the value
-            // but we are not in a FormProvider here.
-            // A possible solution is to pass setValue from the main form.
-            // For now, this logic is broken but the UI will render.
+        if(productData) {
+            debouncedFindQuotes(productData);
         }
-    }, [productSeries, index]);
+    }, [productData, debouncedFindQuotes]);
+
+    useEffect(() => {
+        if (productData?.productSeries) {
+            const newWlid = generateWlid(productData.productSeries);
+            setValue(`products.${index}.wlid`, newWlid, { shouldValidate: true });
+        }
+    }, [productData?.productSeries, index, setValue]);
 
     return (
         <div className="border rounded-lg p-4 space-y-4 relative">
@@ -217,6 +243,43 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
     );
 }
 
+function SimilarQuotesDialog({ open, onOpenChange, quotes }: { open: boolean, onOpenChange: (open: boolean) => void, quotes: Quote[] }) {
+    const getPurchaserName = (id: string) => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown';
+    
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Historical Quote Suggestion</DialogTitle>
+                    <DialogDescription>
+                       We found some similar historical quotes for your reference.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="my-4 space-y-4 max-h-[50vh] overflow-y-auto">
+                    {quotes.map((quote, index) => (
+                         <Alert key={index}>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Quote from {getPurchaserName(quote.purchaserId)} on RFQ {quote.rfqId}</AlertTitle>
+                            <AlertDescription>
+                                <div className="flex justify-between items-center mt-2">
+                                    <span className="font-semibold text-lg text-primary">${quote.price.toFixed(2)}</span>
+                                    <div className="text-right text-xs text-muted-foreground">
+                                        <p>Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}</p>
+                                        <p>Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                            </AlertDescription>
+                        </Alert>
+                    ))}
+                </div>
+                <DialogFooter>
+                    <Button onClick={() => onOpenChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 
 export default function NewRfqPage() {
   const router = useRouter();
@@ -227,6 +290,13 @@ export default function NewRfqPage() {
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [formData, setFormData] = useState<RfqFormValues | null>(null);
+  const [similarQuotes, setSimilarQuotes] = useState<Quote[]>([]);
+  const [isSimilarQuotesDialogOpen, setIsSimilarQuotesDialogOpen] = useState(false);
+  
+  const handleSimilarQuotesFound = useCallback((quotes: Quote[]) => {
+    setSimilarQuotes(quotes);
+    setIsSimilarQuotesDialogOpen(true);
+  }, []);
 
   const purchasingUsers = MOCK_USERS.filter(u => u.role === 'Purchasing');
 
@@ -256,7 +326,7 @@ export default function NewRfqPage() {
     defaultValues,
   });
 
-  const { fields, append, remove, replace } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'products',
   });
@@ -271,8 +341,6 @@ export default function NewRfqPage() {
      const newRfqId = `rfq-${Date.now()}`;
      const newRfqCode = `RFQ-${String(MOCK_RFQS.length + 1).padStart(4, '0')}`;
      
-     // In a real app, this would be an API call.
-     // Here we are just logging and creating notifications.
      console.log('New RFQ Submitted', formData);
 
      formData.assignedPurchaserIds.forEach(purchaserId => {
@@ -281,7 +349,7 @@ export default function NewRfqPage() {
             titleKey: 'notification_new_rfq_title',
             bodyKey: 'notification_new_rfq_body',
             bodyParams: { rfqCode: newRfqCode, salesName: user.name },
-            href: `/dashboard/rfq/${newRfqId}`, // Faking a new ID for the sake of navigation
+            href: `/dashboard/rfq/${newRfqId}`,
         });
      });
 
@@ -314,10 +382,8 @@ export default function NewRfqPage() {
   const getPurchaserName = (id: string) => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown';
   
   const handleAiApply = (extractedData: Partial<RfqFormValues>) => {
-    // Reset the form with extracted data, but keep some defaults if not present
     const newValues: RfqFormValues = { ...defaultValues, ...extractedData };
     
-    // Ensure products have default values if not extracted
     const products = (extractedData.products && extractedData.products.length > 0) ? extractedData.products : defaultValues.products;
 
     const populatedProducts = products.map(p => ({
@@ -358,7 +424,14 @@ export default function NewRfqPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {fields.map((field, index) => (
-                      <ProductRow key={field.id} index={index} control={form.control} remove={remove} />
+                      <ProductRow 
+                        key={field.id} 
+                        index={index} 
+                        control={form.control} 
+                        remove={remove} 
+                        setValue={form.setValue}
+                        onSimilarQuotesFound={handleSimilarQuotesFound}
+                        />
                     ))}
                     <Button type="button" variant="outline" onClick={addProduct}>
                       <Plus className="mr-2 h-4 w-4" /> Add Another Product
@@ -504,8 +577,12 @@ export default function NewRfqPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <SimilarQuotesDialog 
+        open={isSimilarQuotesDialogOpen}
+        onOpenChange={setIsSimilarQuotesDialogOpen}
+        quotes={similarQuotes}
+      />
     </>
   );
 }
-
-    
