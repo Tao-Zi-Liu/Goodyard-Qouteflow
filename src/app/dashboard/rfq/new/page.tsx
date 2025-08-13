@@ -86,7 +86,7 @@ function ProductRow({ index, control, remove }: { index: number, control: any, r
             >
                 <Trash2 className="h-4 w-4" />
             </Button>
-             <div className="grid sm:grid-cols-1 gap-4">
+            <div className="grid sm:grid-cols-1 gap-4">
                 <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
                   <FormItem>
                     <FormLabel>Product Series</FormLabel>
@@ -187,7 +187,9 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button type="button" variant="outline"><Sparkles className="mr-2 h-4 w-4" /> AI Extract</Button>
+                <Button type="button" variant="secondary" className="bg-blue-500 hover:bg-blue-600 text-white">
+                    <Sparkles className="mr-2 h-4 w-4 text-yellow-300" /> AI Extract
+                </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
@@ -506,3 +508,4 @@ export default function NewRfqPage() {
   );
 }
 
+    
