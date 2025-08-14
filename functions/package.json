@@ -1,14 +1,34 @@
-import { MOCK_RFQS } from '@/lib/data';
-import RFQDetailClient from './rfq-detail-client';
-
-// Server component that exports generateStaticParams
-export async function generateStaticParams() {
-  return MOCK_RFQS.map((rfq) => ({
-    id: rfq.id,
-  }));
-}
-
-// Server component that renders the client component
-export default function RFQDetailPage() {
-  return <RFQDetailClient />;
+{
+  "name": "functions",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts .",
+    "build": "tsc",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/functions/src/index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0",
+    "@genkit-ai/googleai": "^1.14.1",
+    "genkit": "^1.14.1",
+    "zod": "^3.24.2",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.56.0",
+    "eslint-config-google": "^0.14.0",
+    "eslint-plugin-import": "^2.29.1",
+    "typescript": "^5.3.3",
+    "@types/node": "^20.0.0"
+  },
+  "private": true
 }
