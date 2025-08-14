@@ -1,5 +1,3 @@
-# Firebase Studio
+# QuoteFlow
 
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+A Next.js application with Firebase Functions for quote management and RFQ processing.
