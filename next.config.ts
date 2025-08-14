@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Remove this line: output: 'export',
+  // Firebase App Hosting needs SSR mode, not static export
 };
 
 export default nextConfig;

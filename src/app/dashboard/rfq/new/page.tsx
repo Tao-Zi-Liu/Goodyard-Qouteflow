@@ -1,6 +1,7 @@
 
 "use client";
 
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
@@ -26,8 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Textarea } from '@/components/ui/textarea';
-import { extractRfqFormData } from '@/ai/flows/extract-rfq-flow';
-import { findSimilarQuotes } from '@/ai/flows/find-similar-quotes-flow';
+import { getApp } from 'firebase/app'; // Assuming you have initialized Firebase app elsewhere
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
@@ -77,10 +77,12 @@ function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: 
                 if (filledFields < 6) return;
 
                 try {
-                    const similarQuotes = await findSimilarQuotes(product);
-                    if (similarQuotes.length > 0) {
-                        onSimilarQuotesFound(similarQuotes);
-                    }
+                  const response = await findSimilarQuotesFunction(product);
+                  const similarQuotesResult = response.data.result; // Access the result from response.data
+
+                  if (similarQuotesResult && similarQuotesResult.length > 0) {
+                      onSimilarQuotesFound(similarQuotesResult); // Pass the actual result
+                  }
                 } catch (error) {
                     console.error("Failed to fetch similar quotes:", error);
                 }
@@ -190,6 +192,9 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const { toast } = useToast();
+        // Get the Cloud Functions instance
+    const functions = getFunctions(getApp());
+    const extractRfqDataFunction = httpsCallable(functions, 'extractRfqData');
 
     const handleExtract = async () => {
         if (!text.trim()) {
@@ -198,8 +203,7 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
         }
         setIsLoading(true);
         try {
-            const result = await extractRfqFormData({ inputText: text });
-            onApply(result);
+          const result = await extractRfqDataFunction({ inputText: text });            onApply(result);
             setIsOpen(false);
             toast({ title: 'Extraction Successful', description: 'The form has been pre-filled with the extracted data.' });
         } catch (error) {

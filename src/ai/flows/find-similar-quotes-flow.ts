@@ -1,16 +1,46 @@
-'use server';
 /**
  * @fileOverview An AI flow to find similar historical quotes.
- *
- * - findSimilarQuotes - A function that finds historical quotes for similar products.
- * - ProductInputSchema - The input Zod schema for the product.
- * - QuoteOutputSchema - The output Zod schema for the quotes.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
-import { MOCK_RFQS } from '@/lib/data';
-import type { Product, Quote } from '@/lib/types';
+import { z } from 'zod';
+// You'll need to create these files or fix the imports
+// import { ai } from '../genkit'; // Adjust path as needed
+// import { MOCK_RFQS } from '../../lib/data'; // Adjust path as needed
+// import type { Product, Quote, RFQ } from '../../lib/types'; // Adjust path as needed
+
+// Temporary types until you provide the actual type definitions
+interface Product {
+  id: string;
+  wlid?: string;
+  productSeries: 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee';
+  sku?: string;
+  hairFiber?: string;
+  cap?: string;
+  capSize?: string;
+  length?: string;
+  density?: string;
+  color?: string;
+  curlStyle?: string;
+  images?: any;
+}
+
+interface Quote {
+  rfqId: string;
+  productId: string;
+  purchaserId: string;
+  price: number;
+  deliveryDate: string;
+  quoteTime: string;
+  status: 'Pending Acceptance' | 'Accepted';
+}
+
+interface RFQ {
+  products: Product[];
+  quotes: Quote[];
+}
+
+// Temporary mock data - replace with actual import
+const MOCK_RFQS: RFQ[] = [];
 
 // Use the existing product schema from the main app, making fields optional for partial matching.
 const ProductInputSchema = z.object({
@@ -27,6 +57,7 @@ const ProductInputSchema = z.object({
   curlStyle: z.string().optional(),
   images: z.any().optional(),
 }).partial();
+
 export type ProductInput = z.infer<typeof ProductInputSchema>;
 
 const QuoteSchema = z.object({
@@ -42,17 +73,11 @@ const QuoteSchema = z.object({
 const QuoteOutputSchema = z.array(QuoteSchema);
 export type QuoteOutput = z.infer<typeof QuoteOutputSchema>;
 
-
-const findSimilarQuotesFlow = ai.defineFlow(
-  {
-    name: 'findSimilarQuotesFlow',
-    inputSchema: ProductInputSchema,
-    outputSchema: QuoteOutputSchema,
-  },
-  async (productInput) => {
+// Simplified version without AI flow - you can add AI back later
+export async function findSimilarQuotes(productInput: ProductInput): Promise<QuoteOutput> {
     const similarQuotes: Quote[] = [];
     
-    const fieldsToCompare: (keyof Product)[] = ['hairFiber', 'cap', 'capSize', 'length', 'density', 'color', 'curlStyle'];
+    const fieldsToCompare: (keyof Omit<Product, 'id' | 'wlid' | 'productSeries' | 'sku' | 'images'>)[] = ['hairFiber', 'cap', 'capSize', 'length', 'density', 'color', 'curlStyle'];
 
     for (const rfq of MOCK_RFQS) {
         for (const historicalProduct of rfq.products) {
@@ -63,16 +88,22 @@ const findSimilarQuotesFlow = ai.defineFlow(
 
             let matchingFields = 0;
             for (const field of fieldsToCompare) {
-                if (productInput[field] && historicalProduct[field] && productInput[field] === historicalProduct[field]) {
-                    matchingFields++;
-                }
-            }
+              const productInputValue = productInput[field];
+              const historicalProductValue = historicalProduct[field];
+          
+              // Explicitly check if both values exist and are strings
+              if (typeof productInputValue === 'string' && typeof historicalProductValue === 'string') {
+                  if (productInputValue === historicalProductValue) {
+                      matchingFields++;
+                  }
+              }
+          }
 
             // If 5 or more fields match, consider it similar
             if (matchingFields >= 5) {
                 const quotesForProduct = MOCK_RFQS
-                    .flatMap(r => r.quotes)
-                    .filter(q => q.productId === historicalProduct.id);
+                .flatMap((r: RFQ) => r.quotes)
+                .filter((q: Quote) => q.productId === historicalProduct.id);
                 
                 similarQuotes.push(...quotesForProduct);
             }
@@ -86,10 +117,4 @@ const findSimilarQuotesFlow = ai.defineFlow(
     const uniqueQuotes = Array.from(new Map(similarQuotes.map(q => [q.rfqId + q.productId + q.purchaserId, q])).values());
 
     return uniqueQuotes.slice(0, 3);
-  }
-);
-
-
-export async function findSimilarQuotes(input: ProductInput): Promise<QuoteOutput> {
-  return findSimilarQuotesFlow(input);
 }

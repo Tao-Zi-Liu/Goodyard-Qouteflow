@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "esModuleInterop": true,
+    "moduleResolution": "nodenext",
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "outDir": "lib",
+    "sourceMap": true,
+    "strict": true,
+    "rootDir": "..", // Add or modify this line
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../src/*"]
+    },
+    "target": "es2017"
+  },
+  "compileOnSave": true,
+"include": [
+    "src", // Keep the functions source files
+    "../src/ai/flows", // Include the flows directory from main src
+    "../src/lib" // Include the lib directory from main src
+  ]
+}

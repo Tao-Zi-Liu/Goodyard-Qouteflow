@@ -1,15 +1,14 @@
-// Remove "use client" from here - this is now a server component
 import { MOCK_RFQS } from '@/lib/data';
 import RFQDetailClient from './rfq-detail-client';
 
-// This function can stay here since this is now a server component
+// Server component that exports generateStaticParams
 export async function generateStaticParams() {
   return MOCK_RFQS.map((rfq) => ({
     id: rfq.id,
   }));
 }
 
-// This is now a server component that just renders the client component
+// Server component that renders the client component
 export default function RFQDetailPage() {
   return <RFQDetailClient />;
 }
