@@ -1,16 +1,17 @@
-
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { db } from '@/lib/firebase'; // <--- Here is the import statement
+import { collection, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, Eye } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useI18n } from '@/hooks/use-i18n';
-import { MOCK_RFQS, MOCK_USERS } from '@/lib/data';
+import { MOCK_USERS } from '@/lib/data';
 import type { RFQ, RFQStatus } from '@/lib/types';
 
 export default function DashboardPage() {
@@ -18,7 +19,20 @@ export default function DashboardPage() {
     const { user } = useAuth();
     const { t } = useI18n();
 
-    const [rfqs] = useState<RFQ[]>(MOCK_RFQS);
+    const [rfqs, setRfqs] = useState<RFQ[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchRfqs = async () => {
+            const rfqsCollection = collection(db, "rfqs");
+            const rfqSnapshot = await getDocs(rfqsCollection);
+            const rfqList = rfqSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RFQ));
+            setRfqs(rfqList);
+            setLoading(false);
+        };
+
+        fetchRfqs();
+    }, []);
     
     const getStatusVariant = (status: RFQStatus) => {
         switch (status) {
@@ -65,6 +79,14 @@ export default function DashboardPage() {
             </TableBody>
         </Table>
     );
+
+    if (loading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6">

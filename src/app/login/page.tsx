@@ -1,4 +1,3 @@
-
 "use client";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -23,16 +22,17 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const success = await login(email);
-    if (success) {
-      router.push('/dashboard');
-    } else {
+    try {
+      await login(email, password);
+      // Successful login will be handled by the onAuthStateChanged listener in AuthProvider
+    } catch (error) {
+      console.error("Login failed:", error);
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Invalid email or password.",
+        description: "Invalid email or password. Please try again.",
       });
-      setIsLoading(false);
+      setIsLoading(false); // Reset loading state only on failure
     }
   };
 
@@ -60,7 +60,7 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@quoteflow.com"
+                    placeholder="zeke@uniwigs.com"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -72,9 +72,9 @@ export default function LoginPage() {
                 <Label htmlFor="password">Password</Label>
                  <div className="relative">
                   <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="password" 
-                    type="password" 
+                  <Input
+                    id="password"
+                    type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}

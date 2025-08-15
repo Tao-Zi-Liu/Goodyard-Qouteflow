@@ -1,4 +1,3 @@
-
 "use client";
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -27,8 +26,10 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Textarea } from '@/components/ui/textarea';
-import { getApp } from 'firebase/app'; // Assuming you have initialized Firebase app elsewhere
+import { getApp } from 'firebase/app';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from '@/lib/firebase';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -72,16 +73,18 @@ function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: 
         () =>
             debounce(async (product: Product) => {
                 if (!product.productSeries) return;
-                
+
                 const filledFields = Object.values(product).filter(v => v && typeof v === 'string').length;
                 if (filledFields < 6) return;
 
                 try {
+                  const functions = getFunctions(getApp());
+                  const findSimilarQuotesFunction = httpsCallable(functions, 'findSimilarQuotes');
                   const response = await findSimilarQuotesFunction(product);
-                  const similarQuotesResult = response.data.result; // Access the result from response.data
+                  const similarQuotesResult = response.data.result;
 
                   if (similarQuotesResult && similarQuotesResult.length > 0) {
-                      onSimilarQuotesFound(similarQuotesResult); // Pass the actual result
+                      onSimilarQuotesFound(similarQuotesResult);
                   }
                 } catch (error) {
                     console.error("Failed to fetch similar quotes:", error);
@@ -192,7 +195,6 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const { toast } = useToast();
-        // Get the Cloud Functions instance
     const functions = getFunctions(getApp());
     const extractRfqDataFunction = httpsCallable(functions, 'extractRfqData');
 
@@ -203,7 +205,8 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
         }
         setIsLoading(true);
         try {
-          const result = await extractRfqDataFunction({ inputText: text });            onApply(result);
+          const result = await extractRfqDataFunction({ inputText: text });
+          onApply(result.data);
             setIsOpen(false);
             toast({ title: 'Extraction Successful', description: 'The form has been pre-filled with the extracted data.' });
         } catch (error) {
@@ -249,7 +252,7 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
 
 function SimilarQuotesDialog({ open, onOpenChange, quotes }: { open: boolean, onOpenChange: (open: boolean) => void, quotes: Quote[] }) {
     const getPurchaserName = (id: string) => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown';
-    
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-2xl">
@@ -296,7 +299,7 @@ export default function NewRfqPage() {
   const [formData, setFormData] = useState<RfqFormValues | null>(null);
   const [similarQuotes, setSimilarQuotes] = useState<Quote[]>([]);
   const [isSimilarQuotesDialogOpen, setIsSimilarQuotesDialogOpen] = useState(false);
-  
+
   const handleSimilarQuotesFound = useCallback((quotes: Quote[]) => {
     setSimilarQuotes(quotes);
     setIsSimilarQuotesDialogOpen(true);
@@ -324,7 +327,7 @@ export default function NewRfqPage() {
       images: [],
     }],
   };
-  
+
   const form = useForm<RfqFormValues>({
     resolver: zodResolver(rfqFormSchema),
     defaultValues,
@@ -339,30 +342,46 @@ export default function NewRfqPage() {
     setFormData(data);
     setIsPreviewOpen(true);
   };
-  
-  const handleSave = () => {
+
+  const handleSave = async () => {
      if (!formData || !user) return;
-     const newRfqId = `rfq-${Date.now()}`;
-     const newRfqCode = `RFQ-${String(MOCK_RFQS.length + 1).padStart(4, '0')}`;
-     
-     console.log('New RFQ Submitted', formData);
 
-     formData.assignedPurchaserIds.forEach(purchaserId => {
-        createNotification({
-            recipientId: purchaserId,
-            titleKey: 'notification_new_rfq_title',
-            bodyKey: 'notification_new_rfq_body',
-            bodyParams: { rfqCode: newRfqCode, salesName: user.name },
-            href: `/dashboard/rfq/${newRfqId}`,
+     try {
+        const newRfqData = {
+            ...formData,
+            inquiryTime: serverTimestamp(),
+            creatorId: user.id,
+            status: 'Waiting for Quote'
+        };
+
+        const docRef = await addDoc(collection(db, "rfqs"), newRfqData);
+        const newRfqId = docRef.id;
+        const newRfqCode = `RFQ-${String(MOCK_RFQS.length + 1).padStart(4, '0')}`;
+
+        formData.assignedPurchaserIds.forEach(purchaserId => {
+            createNotification({
+                recipientId: purchaserId,
+                titleKey: 'notification_new_rfq_title',
+                bodyKey: 'notification_new_rfq_body',
+                bodyParams: { rfqCode: newRfqCode, salesName: user.name },
+                href: `/dashboard/rfq/${newRfqId}`,
+            });
         });
-     });
 
-     toast({
-       title: "RFQ Created",
-       description: "The new RFQ has been successfully created and purchasers have been notified.",
-     });
-     setIsPreviewOpen(false);
-     router.push('/dashboard');
+        toast({
+            title: "RFQ Created",
+            description: "The new RFQ has been successfully created and purchasers have been notified.",
+        });
+        setIsPreviewOpen(false);
+        router.push('/dashboard');
+     } catch (error) {
+         console.error("Error adding document: ", error);
+         toast({
+             variant: "destructive",
+             title: "Error",
+             description: "There was an error creating the RFQ. Please try again.",
+         });
+     }
   }
 
   const addProduct = () => {
@@ -382,13 +401,14 @@ export default function NewRfqPage() {
         images: []
     });
   }
-  
+
   const getPurchaserName = (id: string) => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown';
-  
-  const handleAiApply = (extractedData: Partial<RfqFormValues>) => {
-    const newValues: RfqFormValues = { ...defaultValues, ...extractedData };
-    
-    const products = (extractedData.products && extractedData.products.length > 0) ? extractedData.products : defaultValues.products;
+
+  const handleAiApply = (extractedData: any) => {
+    const data = extractedData.result || {};
+    const newValues: RfqFormValues = { ...defaultValues, ...data };
+
+    const products = (data.products && data.products.length > 0) ? data.products : defaultValues.products;
 
     const populatedProducts = products.map(p => ({
         id: `prod-${Date.now()}-${Math.random()}`,
@@ -428,11 +448,11 @@ export default function NewRfqPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {fields.map((field, index) => (
-                      <ProductRow 
-                        key={field.id} 
-                        index={index} 
-                        control={form.control} 
-                        remove={remove} 
+                      <ProductRow
+                        key={field.id}
+                        index={index}
+                        control={form.control}
+                        remove={remove}
                         setValue={form.setValue}
                         onSimilarQuotesFound={handleSimilarQuotesFound}
                         />
@@ -576,13 +596,12 @@ export default function NewRfqPage() {
               <FileEdit className="mr-2 h-4 w-4" /> Edit
             </Button>
             <Button onClick={handleSave}>
-              <Save className="mr-2 h-4 w-4" /> Save
+              <Save className="mr-2 h-4 w-4" /> Save RFQ
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <SimilarQuotesDialog 
+      <SimilarQuotesDialog
         open={isSimilarQuotesDialogOpen}
         onOpenChange={setIsSimilarQuotesDialogOpen}
         quotes={similarQuotes}
