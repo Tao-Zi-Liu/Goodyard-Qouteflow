@@ -1,11 +1,17 @@
 {
   "hosting": {
-    "public": "out",
+    "public": ".next/out",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
     ]
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "nam5",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "functions": [
     {
@@ -21,10 +27,7 @@
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint",
         "npm --prefix \"$RESOURCE_DIR\" run build"
-      ],
-      "serviceConfig": { // Add or find this object
-         "timeoutSeconds": 60 // Add or modify this field
-      }
+      ]
     }
   ]
 }

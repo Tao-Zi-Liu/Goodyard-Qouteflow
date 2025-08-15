@@ -1,5 +1,5 @@
-import * as functions from "firebase-functions/v2";
-import {CallableRequest} from "firebase-functions/v2/https";
+// This is the corrected import line
+import {onFlow} from "@genkit-ai/firebase/functions";
 
 // Define proper types for your data
 interface FindSimilarQuotesData {
@@ -13,53 +13,37 @@ interface ExtractRfqData {
   // Add other fields as needed
 }
 
-// Import your functions (make sure these exist)
-async function findSimilarQuotes(data: FindSimilarQuotesData) {
-  // Your implementation
-  console.log("Finding similar quotes for:", data);
-  // Return mock data for now
-  return [];
-}
-
-async function extractRfqFlow(data: ExtractRfqData) {
-  // Your implementation
-  console.log("Extracting RFQ from:", data);
-  // Return mock data for now
-  return {};
-}
-
-export const findsimilarquotes = functions.https.onCall(
-  async (request: CallableRequest<FindSimilarQuotesData>) => {
-    const data = request.data;
-
-    try {
-      const similarQuotes = await findSimilarQuotes(data);
-      return {result: similarQuotes};
-    } catch (error) {
-      console.error("Error finding similar quotes:", error);
-      throw new functions.https.HttpsError(
-        "internal",
-        "An error occurred while finding similar quotes.",
-        error
-      );
-    }
-  }
+/**
+ * Finds similar quotes based on the provided text.
+ * @param {string} findSimilarQuotes
+ * - The input text to find similar quotes for.
+ * @returns {Promise<any>} A promise that resolves with the similar quotes.
+ */
+export const findsimilarquotes = onFlow(
+  {
+    name: "findsimilarquotes",
+  },
+  async (data: FindSimilarQuotesData) => {
+    // Your implementation
+    console.log("Finding similar quotes for:", data);
+    // Return mock data for now
+    return [];
+  },
 );
 
-export const extractrfq = functions.https.onCall(
-  async (request: CallableRequest<ExtractRfqData>) => {
-    const data = request.data;
-
-    try {
-      const extractionResult = await extractRfqFlow(data);
-      return {result: extractionResult};
-    } catch (error) {
-      console.error("Error extracting RFQ:", error);
-      throw new functions.https.HttpsError(
-        "internal",
-        "An error occurred while extracting the RFQ.",
-        error
-      );
-    }
-  }
+/**
+ * Extracts Request for Quotation (RFQ) data from the provided text.
+ * @param {string} rfqText - The text of the RFQ to be processed.
+ * @returns {Promise<any>} A promise that resolves with the extracted RFQ data.
+ */
+export const extractrfq = onFlow(
+  {
+    name: "extractrfq",
+  },
+  async (data: ExtractRfqData) => {
+    // Your implementation
+    console.log("Extracting RFQ from:", data);
+    // Return mock data for now
+    return {};
+  },
 );
