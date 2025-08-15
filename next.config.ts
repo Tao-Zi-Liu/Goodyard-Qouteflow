@@ -1,8 +1,6 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  output: 'export',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -19,8 +17,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Remove this line: output: 'export',
-  // Firebase App Hosting needs SSR mode, not static export
+  output: 'export',  // Add this line back for static export
 };
 
 export default nextConfig;
