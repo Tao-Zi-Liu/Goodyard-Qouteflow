@@ -1,3 +1,4 @@
+// src/app/login/page.tsx - Final Clean Version
 "use client";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -21,18 +22,39 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    try {
-      await login(email, password);
-      // Successful login will be handled by the onAuthStateChanged listener in AuthProvider
-    } catch (error) {
-      console.error("Login failed:", error);
+    if (!email || !password) {
       toast({
         variant: "destructive",
-        title: "Login Failed",
-        description: "Invalid email or password. Please try again.",
+        title: "Error",
+        description: "Please enter both email and password.",
       });
-      setIsLoading(false); // Reset loading state only on failure
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const success = await login(email, password);
+      if (success) {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
+        router.push('/dashboard');
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: "Invalid email or password. Please check your credentials.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Login Error",
+        description: "An error occurred during login. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -60,11 +82,12 @@ export default function LoginPage() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="zeke@uniwigs.com"
+                    placeholder="user@example.com"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -72,19 +95,24 @@ export default function LoginPage() {
                 <Label htmlFor="password">Password</Label>
                  <div className="relative">
                   <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
+                  <Input 
+                    id="password" 
+                    type="password" 
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="pl-10"
+                    disabled={isLoading}
                   />
                  </div>
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div> : t('login_button')}
+                {isLoading ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div>
+                ) : (
+                  t('login_button')
+                )}
               </Button>
             </div>
           </form>

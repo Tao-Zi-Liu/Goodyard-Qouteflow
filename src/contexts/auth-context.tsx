@@ -1,49 +1,87 @@
+// src/contexts/auth-context.tsx
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useState, useEffect, useCallback, useContext } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User as FirebaseUser } from 'firebase/auth';
+import { createContext, useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  User as FirebaseUser 
+} from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import type { User } from '@/lib/types';
+import { auth, db } from '@/lib/firebase';
+import type { User, Language } from '@/lib/types';
 
 export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, pass: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
 
+  // Function to get user profile from Firestore
+  const getUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
+    try {
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        return {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          name: userData.name || firebaseUser.displayName || '',
+          role: userData.role || 'Sales',
+          registrationDate: userData.registrationDate || firebaseUser.metadata.creationTime || '',
+          lastLoginTime: new Date().toISOString(),
+          status: userData.status || 'Active',
+          language: userData.language || 'en',
+          avatar: userData.avatar || firebaseUser.photoURL || 'https://placehold.co/100x100'
+        };
+      } else {
+        // If no user profile exists in Firestore, create a default one
+        return {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+          role: 'Sales', // Default role
+          registrationDate: firebaseUser.metadata.creationTime || new Date().toISOString(),
+          lastLoginTime: new Date().toISOString(),
+          status: 'Active',
+          language: 'en',
+          avatar: firebaseUser.photoURL || 'https://placehold.co/100x100'
+        };
+      }
+    } catch (error) {
+      console.error('Error getting user profile:', error);
+      return null;
+    }
+  };
+
+  // Listen for authentication state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const userDocRef = doc(db, 'Users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data() as Omit<User, 'id' | 'email'>;
-          setUser({
-            id: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            ...userData
-          });
-        } else {
-          console.error("No user profile in Firestore for UID:", firebaseUser.uid);
-          await signOut(auth);
-          setUser(null);
+        const userProfile = await getUserProfile(firebaseUser);
+        if (userProfile) {
+          setUser(userProfile);
+          localStorage.setItem('user', JSON.stringify(userProfile));
+          localStorage.setItem('lang', userProfile.language);
         }
       } else {
         setUser(null);
+        localStorage.removeItem('user');
+        localStorage.removeItem('lang');
       }
       setLoading(false);
     });
@@ -51,35 +89,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const login = useCallback(async (email: string, pass: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, pass);
-      console.log("Login successful for:", userCredential.user.email);
-    } catch (error: any) { // Catch the specific error
-      console.error("Firebase Auth Error Code:", error.code);
-      console.error("Firebase Auth Error Message:", error.message);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userProfile = await getUserProfile(userCredential.user);
+      
+      if (userProfile) {
+        setUser(userProfile);
+        localStorage.setItem('user', JSON.stringify(userProfile));
+        localStorage.setItem('lang', userProfile.language);
+        setLoading(false);
+        return true;
+      }
       setLoading(false);
-      throw error;
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      setLoading(false);
+      return false;
     }
-  }, [])
+  }, []);
 
   const logout = useCallback(async () => {
-    await signOut(auth);
-    setUser(null);
-    router.push('/login');
-  }, [router]);
-
-  useEffect(() => {
-    if (!loading) {
-      const isAuthPage = pathname === '/login';
-      if (user && isAuthPage) {
-        router.push('/dashboard');
-      } else if (!user && !isAuthPage) {
-        router.push('/login');
-      }
+    try {
+      await signOut(auth);
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('lang');
+      router.push('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
     }
-  }, [user, loading, pathname, router]);
+  }, [router]);
 
   const value = {
     user,
@@ -88,15 +130,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     loading
   };
-  
-  // Render a loading spinner until the authentication state is determined
-  if (loading) {
-    return (
-        <div className="flex h-screen w-full items-center justify-center bg-background">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-        </div>
-    );
-  }
 
   return (
     <AuthContext.Provider value={value}>
