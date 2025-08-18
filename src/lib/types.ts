@@ -8,10 +8,16 @@ export interface User {
   name: string;
   role: UserRole;
   registrationDate: string;
-  lastLoginTime: string;
+  lastLoginTime: string | null; // Changed from string to allow null
   status: 'Active' | 'Inactive';
   language: Language;
-  avatar: string; // URL to avatar image
+  avatar: string;
+  // Add these new fields:
+  mustChangePassword?: boolean; // For forcing password changes
+  createdBy?: string; // Track who created this user
+  createdAt?: string; // When the user was created
+  updatedBy?: string; // Track who last updated this user
+  updatedAt?: string; // When the user was last updated
 }
 
 export type RFQStatus = 'Waiting for Quote' | 'Quotation in Progress' | 'Quotation Completed' | 'Archived';

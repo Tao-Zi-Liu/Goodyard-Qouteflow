@@ -1,28 +1,45 @@
-// src/lib/firebase.ts
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getFunctions } from 'firebase/functions';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAuth, Auth } from 'firebase/auth';
+import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFunctions, Functions } from 'firebase/functions';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAifBxtQ5bzA_I7b-uwx8RfMHyP55gQjIk",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "goodyard-qouteflow.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "goodyard-qouteflow",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "goodyard-qouteflow.firebasestorage.app",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "1088251195087",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:1088251195087:web:e9ae476a06569a4b1d11ba",
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-KGSE8YBS1V"
 };
 
-// Initialize Firebase only if it hasn't been initialized already
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let db: Firestore | undefined;
+let functions: Functions | undefined;
+let storage: Storage | undefined;
 
-// Initialize Firebase Authentication and get a reference to the service
-export const auth = getAuth(app);
+// Only initialize Firebase on client side
+if (typeof window !== 'undefined') {
+  try {
+    // Initialize Firebase only if it hasn't been initialized
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    
+    // Initialize services
+    auth = getAuth(app);
+    db = getFirestore(app);
+    functions = getFunctions(app);
+    storage = getStorage(app);
+  } catch (error) {
+    console.error('Firebase initialization error:', error);
+  }
+}
 
-// Initialize Cloud Firestore and get a reference to the service
-export const db = getFirestore(app);
-
-// Initialize Cloud Functions and get a reference to the service
-export const functions = getFunctions(app);
-
-export default app;
+// Export with type assertions for SSR
+export { 
+  app,
+  auth,
+  db,
+  functions,
+  storage
+};

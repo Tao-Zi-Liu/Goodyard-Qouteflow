@@ -1,4 +1,3 @@
-// src/contexts/auth-context.tsx
 "use client";
 
 import type { ReactNode } from 'react';
@@ -10,7 +9,7 @@ import {
   onAuthStateChanged,
   User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import type { User, Language } from '@/lib/types';
 
@@ -27,82 +26,121 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
   const router = useRouter();
 
-  // Function to get user profile from Firestore
-  const getUserProfile = async (firebaseUser: FirebaseUser): Promise<User | null> => {
+  // Convert Firebase User to our User type
+  const getUserData = async (firebaseUser: FirebaseUser): Promise<User | null> => {
     try {
-      const userDocRef = doc(db, 'users', firebaseUser.uid);
-      const userDoc = await getDoc(userDocRef);
-      
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
         return {
           id: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          name: userData.name || firebaseUser.displayName || '',
+          email: firebaseUser.email!,
+          name: userData.name || firebaseUser.displayName || 'User',
           role: userData.role || 'Sales',
-          registrationDate: userData.registrationDate || firebaseUser.metadata.creationTime || '',
-          lastLoginTime: new Date().toISOString(),
+          registrationDate: userData.registrationDate?.toDate?.()?.toISOString() || firebaseUser.metadata.creationTime!,
+          lastLoginTime: userData.lastLoginTime,
           status: userData.status || 'Active',
           language: userData.language || 'en',
-          avatar: userData.avatar || firebaseUser.photoURL || 'https://placehold.co/100x100'
-        };
-      } else {
-        // If no user profile exists in Firestore, create a default one
-        return {
-          id: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-          role: 'Sales', // Default role
-          registrationDate: firebaseUser.metadata.creationTime || new Date().toISOString(),
-          lastLoginTime: new Date().toISOString(),
-          status: 'Active',
-          language: 'en',
-          avatar: firebaseUser.photoURL || 'https://placehold.co/100x100'
+          avatar: userData.avatar || firebaseUser.photoURL || 'https://placehold.co/100x100',
+          mustChangePassword: userData.mustChangePassword || false,
+          createdBy: userData.createdBy,
+          createdAt: userData.createdAt?.toDate?.()?.toISOString(),
         };
       }
+      return null;
     } catch (error) {
-      console.error('Error getting user profile:', error);
+      console.error('Error fetching user data:', error);
       return null;
     }
   };
 
-  // Listen for authentication state changes
+  // Listen for auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userProfile = await getUserProfile(firebaseUser);
-        if (userProfile) {
-          setUser(userProfile);
-          localStorage.setItem('user', JSON.stringify(userProfile));
-          localStorage.setItem('lang', userProfile.language);
-        }
-      } else {
-        setUser(null);
-        localStorage.removeItem('user');
-        localStorage.removeItem('lang');
-      }
-      setLoading(false);
-    });
+    // Only run on client side
+    if (typeof window === 'undefined') {
+      return;
+    }
 
-    return () => unsubscribe();
+    // Check if auth is properly initialized
+    if (!auth) {
+      console.error('Firebase auth is not initialized');
+      setLoading(false);
+      return;
+    }
+
+    setIsInitialized(true);
+
+    let unsubscribe: (() => void) | undefined;
+
+    try {
+      unsubscribe = onAuthStateChanged(
+        auth, 
+        async (firebaseUser) => {
+          try {
+            if (firebaseUser) {
+              const userData = await getUserData(firebaseUser);
+              if (userData) {
+                setUser(userData);
+                // Only use localStorage on client side
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('user', JSON.stringify(userData));
+                  localStorage.setItem('lang', userData.language);
+                }
+              }
+            } else {
+              setUser(null);
+              // Only use localStorage on client side
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('user');
+                localStorage.removeItem('lang');
+              }
+            }
+          } catch (error) {
+            console.error('Error processing auth state change:', error);
+          } finally {
+            setLoading(false);
+          }
+        },
+        (error) => {
+          console.error('Auth state change error:', error);
+          setLoading(false);
+        }
+      );
+    } catch (error) {
+      console.error('Error setting up auth listener:', error);
+      setLoading(false);
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    // Ensure we're on client side
+    if (typeof window === 'undefined' || !auth) {
+      console.error('Cannot login: Firebase auth not available');
+      return false;
+    }
+
     setLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userProfile = await getUserProfile(userCredential.user);
+      const userData = await getUserData(userCredential.user);
       
-      if (userProfile) {
-        setUser(userProfile);
-        localStorage.setItem('user', JSON.stringify(userProfile));
-        localStorage.setItem('lang', userProfile.language);
-        setLoading(false);
+      if (userData) {
+        // Update last login time in Firestore
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          lastLoginTime: new Date().toISOString()
+        }, { merge: true });
+        
         return true;
       }
-      setLoading(false);
       return false;
     } catch (error) {
       console.error('Login error:', error);
@@ -112,11 +150,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // Ensure we're on client side
+    if (typeof window === 'undefined' || !auth) {
+      console.error('Cannot logout: Firebase auth not available');
+      return;
+    }
+
     try {
       await signOut(auth);
-      setUser(null);
-      localStorage.removeItem('user');
-      localStorage.removeItem('lang');
       router.push('/login');
     } catch (error) {
       console.error('Logout error:', error);
@@ -128,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     login,
     logout,
-    loading
+    loading: loading || !isInitialized
   };
 
   return (

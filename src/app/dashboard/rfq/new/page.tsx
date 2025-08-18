@@ -1,3 +1,4 @@
+
 "use client";
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -6,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save, Sparkles, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save, Sparkles, X } from 'lucide-react';
 import { debounce } from 'lodash';
 
 import { Button } from '@/components/ui/button';
@@ -18,18 +19,18 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useI18n } from '@/hooks/use-i18n';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_USERS, MOCK_RFQS } from '@/lib/data';
+import { collection, addDoc, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { rfqFormSchema } from '@/lib/schemas';
-import type { ProductSeries, RFQ, Product, Quote } from '@/lib/types';
+import type { ProductSeries, RFQ, Product, Quote, User } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Textarea } from '@/components/ui/textarea';
 import { getApp } from 'firebase/app';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from '@/lib/firebase';
+import { SimilarQuotesDialog } from '@/components/similar-quotes-dialog';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -43,31 +44,72 @@ const wlidPrefixMap: Record<ProductSeries, string> = {
     'Synthetic Product': 'FTCS',
 };
 
-const generateWlid = (productSeries: ProductSeries): string => {
+const generateWlid = async (productSeries: ProductSeries): Promise<string> => {
     const prefix = wlidPrefixMap[productSeries];
     let maxSuffix = 0;
 
-    MOCK_RFQS.forEach(rfq => {
-        rfq.products.forEach(product => {
-            if (product.wlid.startsWith(prefix)) {
-                const suffix = parseInt(product.wlid.substring(prefix.length), 10);
-                if (suffix > maxSuffix) {
-                    maxSuffix = suffix;
-                }
+    try {
+        const rfqsSnapshot = await getDocs(collection(db, 'rfqs'));
+        
+        rfqsSnapshot.forEach(doc => {
+            const rfqData = doc.data() as RFQ;
+            if (rfqData.products) {
+                rfqData.products.forEach(product => {
+                    if (product.wlid && product.wlid.startsWith(prefix)) {
+                        const suffix = parseInt(product.wlid.substring(prefix.length), 10);
+                        if (!isNaN(suffix) && suffix > maxSuffix) {
+                            maxSuffix = suffix;
+                        }
+                    }
+                });
             }
         });
-    });
+    } catch (error) {
+        console.error('Error generating WLID:', error);
+    }
 
     const newSuffix = (maxSuffix + 1).toString().padStart(4, '0');
     return `${prefix}${newSuffix}`;
 };
 
+const uploadImages = async (files: File[], rfqId: string, productId: string): Promise<string[]> => {
+  if (!storage) {
+      console.error('Firebase Storage not initialized');
+      return [];
+  }
 
-function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: { index: number, control: any, remove: (index: number) => void, setValue: any, onSimilarQuotesFound: (quotes: Quote[]) => void }) {
+  const uploadPromises = files.map(async (file, index) => {
+      try {
+          const fileName = `rfqs/${rfqId}/${productId}/${Date.now()}_${index}_${file.name}`;
+          const storageRef = ref(storage, fileName);
+          const snapshot = await uploadBytes(storageRef, file);
+          const downloadURL = await getDownloadURL(snapshot.ref);
+          return downloadURL;
+      } catch (error) {
+          console.error('Error uploading image:', error);
+          return null;
+      }
+  });
+
+  const results = await Promise.all(uploadPromises);
+  return results.filter((url): url is string => url !== null);
+};
+
+
+function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: { 
+    index: number, 
+    control: any, 
+    remove: (index: number) => void, 
+    setValue: any, 
+    onSimilarQuotesFound: (quotes: Quote[]) => void 
+}) {
     const productData = useWatch({
         control,
         name: `products.${index}`,
     });
+
+    const [selectedImages, setSelectedImages] = useState<File[]>([]);
+    const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
 
     const debouncedFindQuotes = useMemo(
         () =>
@@ -79,12 +121,12 @@ function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: 
 
                 try {
                   const functions = getFunctions(getApp());
-                  const findSimilarQuotesFunction = httpsCallable(functions, 'findSimilarQuotes');
+                  const findSimilarQuotesFunction = httpsCallable(functions, 'findsimilarquotes');
                   const response = await findSimilarQuotesFunction(product);
-                  const similarQuotesResult = response.data.result;
+                  const similarQuotesResult = response.data as { result?: Quote[] };
 
-                  if (similarQuotesResult && similarQuotesResult.length > 0) {
-                      onSimilarQuotesFound(similarQuotesResult);
+                  if (similarQuotesResult?.result && similarQuotesResult.result.length > 0) {
+                      onSimilarQuotesFound(similarQuotesResult.result);
                   }
                 } catch (error) {
                     console.error("Failed to fetch similar quotes:", error);
@@ -101,92 +143,147 @@ function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: 
 
     useEffect(() => {
         if (productData?.productSeries) {
-            const newWlid = generateWlid(productData.productSeries);
-            setValue(`products.${index}.wlid`, newWlid, { shouldValidate: true });
+            generateWlid(productData.productSeries).then(newWlid => {
+                setValue(`products.${index}.wlid`, newWlid, { shouldValidate: true });
+            });
         }
     }, [productData?.productSeries, index, setValue]);
 
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length + selectedImages.length > 5) {
+            alert('Maximum 5 images allowed per product');
+            return;
+        }
+
+        setSelectedImages(prev => [...prev, ...files]);
+        
+        const newPreviewUrls = files.map(file => URL.createObjectURL(file));
+        setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+        
+        setValue(`products.${index}.imageFiles`, [...selectedImages, ...files]);
+    };
+
+    const removeImage = (imageIndex: number) => {
+        const newSelectedImages = selectedImages.filter((_, i) => i !== imageIndex);
+        setSelectedImages(newSelectedImages);
+        const newPreviewUrls = imagePreviewUrls.filter((_, i) => i !== imageIndex);
+        setImagePreviewUrls(newPreviewUrls);
+        setValue(`products.${index}.imageFiles`, newSelectedImages);
+    };
+
     return (
-        <div className="border rounded-lg p-4 space-y-4 relative">
-            <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
-                onClick={() => remove(index)}
-            >
-                <Trash2 className="h-4 w-4" />
-            </Button>
-            <div className="grid sm:grid-cols-1 gap-4">
-                <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product Series</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-            </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-                <FormField control={control} name={`products.${index}.wlid`} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>WLID</FormLabel>
-                    <FormControl>
-                      <Input {...field} readOnly className="bg-muted/50" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={control} name={`products.${index}.sku`} render={({ field }) => (
-                  <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-            </div>
-            <div className="space-y-4">
-              <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
-                <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={control} name={`products.${index}.cap`} render={({ field }) => (
-                 <FormItem><FormLabel>Cap</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.capSize`} render={({ field }) => (
-                 <FormItem><FormLabel>Cap Size</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.length`} render={({ field }) => (
-                 <FormItem><FormLabel>Length</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.density`} render={({ field }) => (
-                 <FormItem><FormLabel>Density</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.color`} render={({ field }) => (
-                 <FormItem><FormLabel>Color</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.curlStyle`} render={({ field }) => (
-                 <FormItem><FormLabel>Curls</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-            </div>
-            <FormField control={control} name={`products.${index}.images`} render={({ field }) => (
+      <div className="border rounded-lg p-4 space-y-4 relative">
+          <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+              onClick={() => remove(index)}
+          >
+              <Trash2 className="h-4 w-4" />
+          </Button>
+          <div className="grid sm:grid-cols-1 gap-4">
+              <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Images</FormLabel>
-                    <FormControl>
+                  <FormLabel>Product Series</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+              <FormField control={control} name={`products.${index}.wlid`} render={({ field }) => (
+                <FormItem>
+                  <FormLabel>WLID</FormLabel>
+                  <FormControl>
+                    <Input {...field} readOnly className="bg-muted/50" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={control} name={`products.${index}.sku`} render={({ field }) => (
+                <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+          </div>
+          <div className="space-y-4">
+            <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
+              <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+            <FormField control={control} name={`products.${index}.cap`} render={({ field }) => (
+               <FormItem><FormLabel>Cap</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={control} name={`products.${index}.capSize`} render={({ field }) => (
+               <FormItem><FormLabel>Cap Size</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={control} name={`products.${index}.length`} render={({ field }) => (
+               <FormItem><FormLabel>Length</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={control} name={`products.${index}.density`} render={({ field }) => (
+               <FormItem><FormLabel>Density</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={control} name={`products.${index}.color`} render={({ field }) => (
+               <FormItem><FormLabel>Color</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+             <FormField control={control} name={`products.${index}.curlStyle`} render={({ field }) => (
+               <FormItem><FormLabel>Curls</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+            )} />
+          </div>
+          
+          <FormItem>
+              <FormLabel>Images</FormLabel>
+              <FormControl>
+                  <div className="space-y-4">
                       <div className="flex items-center justify-center w-full">
                           <label htmlFor={`dropzone-file-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
                               <div className="flex flex-col items-center justify-center pt-5 pb-6">
                                   <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
                                   <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                  <p className="text-xs text-muted-foreground">Each image is limited to 3M, and a maximum of 5 images can be uploaded</p>
+                                  <p className="text-xs text-muted-foreground">Each image is limited to 3MB, and a maximum of 5 images can be uploaded</p>
                               </div>
-                              <Input id={`dropzone-file-${index}`} type="file" className="hidden" multiple onChange={(e) => field.onChange(Array.from(e.target.files || []))} />
+                              <Input 
+                                  id={`dropzone-file-${index}`} 
+                                  type="file" 
+                                  className="hidden" 
+                                  multiple 
+                                  accept="image/*"
+                                  onChange={handleImageChange}
+                              />
                           </label>
                       </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-        </div>
+                      
+                      {imagePreviewUrls.length > 0 && (
+                          <div className="grid grid-cols-5 gap-2">
+                              {imagePreviewUrls.map((url, imgIndex) => (
+                                  <div key={imgIndex} className="relative group">
+                                      <img 
+                                          src={url} 
+                                          alt={`Preview ${imgIndex + 1}`} 
+                                          className="w-full h-20 object-cover rounded-lg"
+                                      />
+                                      <Button
+                                          type="button"
+                                          variant="destructive"
+                                          size="icon"
+                                          className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={() => removeImage(imgIndex)}
+                                      >
+                                          <X className="h-3 w-3" />
+                                      </Button>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              </FormControl>
+              <FormMessage />
+          </FormItem>
+      </div>
     );
 }
 
@@ -195,8 +292,7 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const { toast } = useToast();
-    const functions = getFunctions(getApp());
-    const extractRfqDataFunction = httpsCallable(functions, 'extractRfqData');
+    const { t } = useI18n();
 
     const handleExtract = async () => {
         if (!text.trim()) {
@@ -205,8 +301,10 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
         }
         setIsLoading(true);
         try {
-          const result = await extractRfqDataFunction({ inputText: text });
-          onApply(result.data);
+            const functions = getFunctions(getApp());
+            const extractRfqDataFunction = httpsCallable(functions, 'extractrfq');
+            const result = await extractRfqDataFunction({ inputText: text });
+            onApply(result.data);
             setIsOpen(false);
             toast({ title: 'Extraction Successful', description: 'The form has been pre-filled with the extracted data.' });
         } catch (error) {
@@ -216,77 +314,38 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
             setIsLoading(false);
         }
     };
-
+    
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button type="button" variant="secondary" className="bg-blue-500 hover:bg-blue-600 text-white">
-                    <Sparkles className="mr-2 h-4 w-4 text-yellow-300" /> AI Extract
+                <Button variant="outline" className="bg-gradient-to-r from-purple-400 to-pink-500 text-white border-none hover:from-purple-500 hover:to-pink-600 hover:text-white">
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    {t('button_ai_extract')}
                 </Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Extract RFQ from Text</DialogTitle>
+                    <DialogTitle>AI RFQ Extraction</DialogTitle>
                     <DialogDescription>
-                        Paste the RFQ details below, and the AI will attempt to pre-fill the form for you.
+                        Paste the RFQ details from an email or message, and the AI will attempt to fill out the form for you.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                    <Textarea
-                        placeholder="e.g., New customer at new@example.com needs a quote for a Wig, SKU W-123, Natural Black. Assign to Purchasing Agent."
-                        className="min-h-[150px]"
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                    />
-                </div>
+                <Textarea
+                    placeholder="e.g., 'New customer rfq@example.com wants a quote for two products. First is a Remy Wig SKU W-123, 18 inches, color Natural Black. Second is a topper, SKU T-456. Please assign to Purchasing Agent.'"
+                    rows={8}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                />
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
                     <Button onClick={handleExtract} disabled={isLoading}>
-                        {isLoading ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div> : 'Extract & Apply'}
+                        {isLoading ? "Extracting..." : "Extract and Apply"}
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     );
 }
-
-function SimilarQuotesDialog({ open, onOpenChange, quotes }: { open: boolean, onOpenChange: (open: boolean) => void, quotes: Quote[] }) {
-    const getPurchaserName = (id: string) => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown';
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Historical Quote Suggestion</DialogTitle>
-                    <DialogDescription>
-                       We found some similar historical quotes for your reference.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="my-4 space-y-4 max-h-[50vh] overflow-y-auto">
-                    {quotes.map((quote, index) => (
-                         <Alert key={index}>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Quote from {getPurchaserName(quote.purchaserId)} on RFQ {quote.rfqId}</AlertTitle>
-                            <AlertDescription>
-                                <div className="flex justify-between items-center mt-2">
-                                    <span className="font-semibold text-lg text-primary">${quote.price.toFixed(2)}</span>
-                                    <div className="text-right text-xs text-muted-foreground">
-                                        <p>Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}</p>
-                                        <p>Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                            </AlertDescription>
-                        </Alert>
-                    ))}
-                </div>
-                <DialogFooter>
-                    <Button onClick={() => onOpenChange(false)}>Close</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
 
 export default function NewRfqPage() {
   const router = useRouter();
@@ -299,22 +358,66 @@ export default function NewRfqPage() {
   const [formData, setFormData] = useState<RfqFormValues | null>(null);
   const [similarQuotes, setSimilarQuotes] = useState<Quote[]>([]);
   const [isSimilarQuotesDialogOpen, setIsSimilarQuotesDialogOpen] = useState(false);
+  const [purchasingUsers, setPurchasingUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [rfqCount, setRfqCount] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchPurchasingUsers = async () => {
+      try {
+        const usersQuery = query(
+          collection(db, 'users'), 
+          where('role', '==', 'Purchasing'),
+          where('status', '==', 'Active')
+        );
+        const snapshot = await getDocs(usersQuery);
+        const users = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as User[];
+        setPurchasingUsers(users);
+      } catch (error) {
+        console.error('Error fetching purchasing users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    const fetchRfqCount = async () => {
+      try {
+        const rfqsSnapshot = await getDocs(collection(db, 'rfqs'));
+        setRfqCount(rfqsSnapshot.size);
+      } catch (error) {
+        console.error('Error fetching RFQ count:', error);
+      }
+    };
+  
+    fetchPurchasingUsers();
+    fetchRfqCount();
+  }, []);
 
   const handleSimilarQuotesFound = useCallback((quotes: Quote[]) => {
     setSimilarQuotes(quotes);
     setIsSimilarQuotesDialogOpen(true);
   }, []);
 
-  const purchasingUsers = MOCK_USERS.filter(u => u.role === 'Purchasing');
-
   const defaultProductSeries: ProductSeries = 'Wig';
+  const [defaultWlid, setDefaultWlid] = useState<string>('');
+
+  useEffect(() => {
+    generateWlid(defaultProductSeries).then(wlid => {
+      setDefaultWlid(wlid);
+    });
+  }, []);
+
   const defaultValues: RfqFormValues = {
     customerType: 'New',
     customerEmail: '',
     assignedPurchaserIds: [],
     products: [{
       id: `prod-${Date.now()}`,
-      wlid: generateWlid(defaultProductSeries),
+      wlid: defaultWlid,
       productSeries: defaultProductSeries,
       sku: '',
       hairFiber: '',
@@ -346,49 +449,79 @@ export default function NewRfqPage() {
   const handleSave = async () => {
      if (!formData || !user) return;
 
+     setIsSaving(true);
      try {
-        const newRfqData = {
-            ...formData,
-            inquiryTime: serverTimestamp(),
-            creatorId: user.id,
-            status: 'Waiting for Quote'
-        };
+        const newRfqCode = `RFQ-${String(rfqCount + 1).padStart(4, '0')}`;
+        
+        const newRfqData: Omit<RFQ, 'id' | 'products'> & { code: string } = {
+          code: newRfqCode,
+          customerType: formData.customerType,
+          customerEmail: formData.customerEmail,
+          assignedPurchaserIds: formData.assignedPurchaserIds,
+          inquiryTime: new Date().toISOString(),
+          creatorId: user.id,
+          status: 'Waiting for Quote',
+          quotes: []
+      };
 
         const docRef = await addDoc(collection(db, "rfqs"), newRfqData);
         const newRfqId = docRef.id;
-        const newRfqCode = `RFQ-${String(MOCK_RFQS.length + 1).padStart(4, '0')}`;
 
-        formData.assignedPurchaserIds.forEach(purchaserId => {
-            createNotification({
-                recipientId: purchaserId,
-                titleKey: 'notification_new_rfq_title',
-                bodyKey: 'notification_new_rfq_body',
-                bodyParams: { rfqCode: newRfqCode, salesName: user.name },
-                href: `/dashboard/rfq/${newRfqId}`,
-            });
-        });
+        const productsWithImages = await Promise.all(
+          formData.products.map(async (product: any) => {
+              let imageUrls: string[] = [];
+              
+              if (product.imageFiles && product.imageFiles.length > 0) {
+                  imageUrls = await uploadImages(product.imageFiles, newRfqId, product.id);
+              }
+              
+              const { imageFiles, ...productData } = product;
+              return {
+                  ...productData,
+                  images: imageUrls
+              };
+          })
+      );
 
-        toast({
-            title: "RFQ Created",
-            description: "The new RFQ has been successfully created and purchasers have been notified.",
-        });
-        setIsPreviewOpen(false);
-        router.push('/dashboard');
-     } catch (error) {
-         console.error("Error adding document: ", error);
-         toast({
-             variant: "destructive",
-             title: "Error",
-             description: "There was an error creating the RFQ. Please try again.",
-         });
-     }
-  }
+      await updateDoc(doc(db, "rfqs", newRfqId), {
+          products: productsWithImages
+      });
 
-  const addProduct = () => {
+        for (const purchaserId of formData.assignedPurchaserIds) {
+          await createNotification({
+              recipientId: purchaserId,
+              titleKey: 'notification_new_rfq_title',
+              bodyKey: 'notification_new_rfq_body',
+              bodyParams: { rfqCode: newRfqCode, salesName: user.name },
+              href: `/dashboard/rfq/${newRfqId}`,
+          });
+      }
+
+      toast({
+          title: "RFQ Created",
+          description: "The new RFQ has been successfully created and purchasers have been notified.",
+      });
+      setIsPreviewOpen(false);
+      router.push('/dashboard');
+   } catch (error) {
+       console.error("Error creating RFQ: ", error);
+       toast({
+           variant: "destructive",
+           title: "Error",
+           description: "There was an error creating the RFQ. Please try again.",
+       });
+   } finally {
+       setIsSaving(false);
+   }
+};
+
+  const addProduct = async () => {
     const newProductSeries: ProductSeries = 'Wig';
+    const newWlid = await generateWlid(newProductSeries);
+    
     append({
         id: `prod-${Date.now()}`,
-        wlid: generateWlid(newProductSeries),
+        wlid: newWlid,
         productSeries: newProductSeries,
         sku: '',
         hairFiber: '',
@@ -402,19 +535,19 @@ export default function NewRfqPage() {
     });
   }
 
-  const getPurchaserName = (id: string) => MOCK_USERS.find(u => u.id === id)?.name || 'Unknown';
+  const getPurchaserName = (id: string) => purchasingUsers.find(u => u.id === id)?.name || 'Unknown';
 
-  const handleAiApply = (extractedData: any) => {
+  const handleAiApply = async (extractedData: any) => {
     const data = extractedData.result || {};
     const newValues: RfqFormValues = { ...defaultValues, ...data };
 
     const products = (data.products && data.products.length > 0) ? data.products : defaultValues.products;
 
-    const populatedProducts = products.map(p => ({
+    const populatedProducts = await Promise.all(products.map(async (p: any) => ({
         id: `prod-${Date.now()}-${Math.random()}`,
-        wlid: p.wlid || generateWlid(p.productSeries || defaultProductSeries),
+        wlid: p.wlid || await generateWlid(p.productSeries || defaultProductSeries),
         ...p
-    }));
+    })));
 
     form.reset({
       ...newValues,
@@ -492,44 +625,48 @@ export default function NewRfqPage() {
                     <CardTitle>Assign Purchaser</CardTitle>
                   </CardHeader>
                    <CardContent>
-                      <FormField
-                          control={form.control}
-                          name="assignedPurchaserIds"
-                          render={() => (
-                              <FormItem>
-                                  <FormLabel>Select Purchasers</FormLabel>
-                                  <div className="space-y-2">
-                                      {purchasingUsers.map((pUser) => (
-                                          <FormField
-                                              key={pUser.id}
-                                              control={form.control}
-                                              name="assignedPurchaserIds"
-                                              render={({ field }) => {
-                                                  return (
-                                                      <FormItem key={pUser.id} className="flex flex-row items-start space-x-3 space-y-0">
-                                                          <FormControl>
-                                                              <Checkbox
-                                                                  checked={field.value?.includes(pUser.id)}
-                                                                  onCheckedChange={(checked) => {
-                                                                      return checked
-                                                                          ? field.onChange([...(field.value || []), pUser.id])
-                                                                          : field.onChange(field.value?.filter((value) => value !== pUser.id));
-                                                                  }}
-                                                              />
-                                                          </FormControl>
-                                                          <FormLabel className="font-normal">
-                                                              {pUser.name}
-                                                          </FormLabel>
-                                                      </FormItem>
-                                                  );
-                                              }}
-                                          />
-                                      ))}
-                                  </div>
-                                  <FormMessage />
-                              </FormItem>
-                          )}
-                      />
+                      {loadingUsers ? (
+                        <div className="text-center py-4">Loading purchasers...</div>
+                      ) : (
+                        <FormField
+                            control={form.control}
+                            name="assignedPurchaserIds"
+                            render={() => (
+                                <FormItem>
+                                    <FormLabel>Select Purchasers</FormLabel>
+                                    <div className="space-y-2">
+                                        {purchasingUsers.map((pUser) => (
+                                            <FormField
+                                                key={pUser.id}
+                                                control={form.control}
+                                                name="assignedPurchaserIds"
+                                                render={({ field }) => {
+                                                    return (
+                                                        <FormItem key={pUser.id} className="flex flex-row items-start space-x-3 space-y-0">
+                                                            <FormControl>
+                                                                <Checkbox
+                                                                    checked={field.value?.includes(pUser.id)}
+                                                                    onCheckedChange={(checked) => {
+                                                                        return checked
+                                                                            ? field.onChange([...(field.value || []), pUser.id])
+                                                                            : field.onChange(field.value?.filter((value) => value !== pUser.id));
+                                                                    }}
+                                                                />
+                                                            </FormControl>
+                                                            <FormLabel className="font-normal">
+                                                                {pUser.name}
+                                                            </FormLabel>
+                                                        </FormItem>
+                                                    );
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                      )}
                   </CardContent>
                 </Card>
               </div>
@@ -595,8 +732,8 @@ export default function NewRfqPage() {
             <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
               <FileEdit className="mr-2 h-4 w-4" /> Edit
             </Button>
-            <Button onClick={handleSave}>
-              <Save className="mr-2 h-4 w-4" /> Save RFQ
+            <Button onClick={handleSave} disabled={isSaving}>
+              <Save className="mr-2 h-4 w-4" /> {isSaving ? "Saving..." : "Save RFQ"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -605,7 +742,10 @@ export default function NewRfqPage() {
         open={isSimilarQuotesDialogOpen}
         onOpenChange={setIsSimilarQuotesDialogOpen}
         quotes={similarQuotes}
+        purchasingUsers={purchasingUsers}
       />
     </>
-  );
+  ); 
 }
+
+    

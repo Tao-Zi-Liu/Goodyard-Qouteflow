@@ -35,11 +35,25 @@ export default function RFQDetailClient() {
             if (params.id) {
                 const docRef = doc(db, "rfqs", params.id as string);
                 const docSnap = await getDoc(docRef);
-
+    
                 if (docSnap.exists()) {
-                    const rfqData = { id: docSnap.id, ...docSnap.data() } as RFQ;
+                    const rfqData = { 
+                        id: docSnap.id, 
+                        ...docSnap.data(),
+                        // IMPORTANT: Ensure quotes always exists as an array
+                        quotes: docSnap.data().quotes || []
+                    } as RFQ;
                     setRfq(rfqData);
-                    const foundCreator = MOCK_USERS.find(u => u.id === rfqData.creatorId);
+                    
+                    // Replace MOCK_USERS with actual user fetching from Firestore
+                    const { getDocs, collection } = await import('firebase/firestore');
+                    const usersSnapshot = await getDocs(collection(db, 'users'));
+                    const users = usersSnapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    const foundCreator = users.find(u => u.id === rfqData.creatorId);
                     setCreator(foundCreator || null);
                 } else {
                     toast({
@@ -52,14 +66,20 @@ export default function RFQDetailClient() {
             }
             setLoading(false);
         };
-
+    
         fetchRfq();
     }, [params.id, router, toast]);
 
     const getPurchaser = (purchaserId: string) => MOCK_USERS.find(u => u.id === purchaserId);
 
     const getStatusVariant = (status: RFQStatus) => {
-        // ... (same as before)
+        switch (status) {
+            case 'Waiting for Quote': return 'secondary';
+            case 'Quotation in Progress': return 'default';
+            case 'Quotation Completed': return 'outline';
+            case 'Archived': return 'destructive';
+            default: return 'secondary';
+        }
     };
 
     const handleAcceptQuote = async (productId: string, purchaserId: string) => {
@@ -100,7 +120,7 @@ export default function RFQDetailClient() {
                 recipientId: acceptedQuote.purchaserId,
                 titleKey: 'notification_quote_accepted_title',
                 bodyKey: 'notification_quote_accepted_body',
-                bodyParams: { rfqCode: rfq.code, productName: rfq.products.find(p => p.id === productId)?.sku || '' },
+                bodyParams: { rfqCode: rfq.rfqCode || rfq.code, productName: rfq.products.find(p => p.id === productId)?.sku || '' },
                 href: `/dashboard/rfq/${rfq.id}`,
             });
 
@@ -128,13 +148,15 @@ export default function RFQDetailClient() {
                 );
             } else {
                 const newQuote: Quote = {
+                    id: `quote-${Date.now()}`, // Add ID for the quote
                     rfqId: rfq.id,
                     productId,
                     purchaserId: user.id,
                     price,
                     deliveryDate: deliveryDate.toISOString(),
                     quoteTime: new Date().toISOString(),
-                    status: 'Pending Acceptance'
+                    status: 'Pending Acceptance',
+                    notes: '' // Add notes field
                 };
                 updatedQuotes = [...rfq.quotes, newQuote];
             }
@@ -155,7 +177,7 @@ export default function RFQDetailClient() {
                 recipientId: rfq.creatorId,
                 titleKey: isUpdate ? 'notification_quote_updated_title' : 'notification_new_quote_title',
                 bodyKey: isUpdate ? 'notification_quote_updated_body' : 'notification_new_quote_body',
-                bodyParams: { purchaserName: user.name, rfqCode: rfq.code },
+                bodyParams: { purchaserName: user.name, rfqCode: rfq.rfqCode || rfq.code },
                 href: `/dashboard/rfq/${rfq.id}`,
             });
 
@@ -181,7 +203,7 @@ export default function RFQDetailClient() {
         return null;
     }
 
-    const isUserAssigned = rfq.assignedPurchaserIds.includes(user?.id || '');
+    const isUserAssigned = rfq.assignedPurchaserIds?.includes(user?.id || '') || false;
     
     return (
         <div className="flex flex-col gap-6">
@@ -192,11 +214,17 @@ export default function RFQDetailClient() {
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                        {t('rfq_detail_title')} {rfq.code}
+                        {t('rfq_detail_title')} {rfq.rfqCode || rfq.code || `RFQ-${rfq.id.slice(0,6)}`}
                         <Badge variant={getStatusVariant(rfq.status)}>{t(`status_${rfq.status.toLowerCase().replace(/ /g, '_')}`)}</Badge>
                     </h1>
                     <p className="text-muted-foreground">
-                        {t('field_label_inquiry_time')}: {new Date(rfq.inquiryTime.seconds * 1000).toLocaleString()}
+                        {t('field_label_inquiry_time')}: {
+                            rfq.inquiryTime?.seconds 
+                                ? new Date(rfq.inquiryTime.seconds * 1000).toLocaleString()
+                                : rfq.inquiryTime 
+                                    ? new Date(rfq.inquiryTime).toLocaleString()
+                                    : 'N/A'
+                        }
                     </p>
                 </div>
             </div>
@@ -205,11 +233,17 @@ export default function RFQDetailClient() {
             <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
                     {rfq.products.map(product => {
-                        const productQuotes = rfq.quotes.filter(q => q.productId === product.id);
+                        // Safely access quotes with default empty array
+                        const quotes = rfq.quotes || [];
+                        const productQuotes = quotes.filter(q => q.productId === product.id);
                         const userQuote = productQuotes.find(q => q.purchaserId === user?.id);
                         const acceptedQuote = productQuotes.find(q => q.status === 'Accepted');
                         const canSalesAccept = user?.role === 'Sales' && !acceptedQuote && productQuotes.length > 0;
-                        
+                        const canPurchaserQuote = user?.role === 'Purchasing' && 
+                            rfq.assignedPurchaserIds?.includes(user?.id || '') && 
+                            !userQuote && 
+                            !acceptedQuote;
+
                         return (
                             <Card key={product.id}>
                                 <CardHeader>
@@ -218,7 +252,38 @@ export default function RFQDetailClient() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
-                                        {/* Product details */}
+                                        <div>
+                                            <span className="text-muted-foreground">Product Series:</span>
+                                            <p className="font-medium">{product.productSeries}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Hair Fiber:</span>
+                                            <p className="font-medium">{product.hairFiber || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Cap:</span>
+                                            <p className="font-medium">{product.cap || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Cap Size:</span>
+                                            <p className="font-medium">{product.capSize || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Length:</span>
+                                            <p className="font-medium">{product.length || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Density:</span>
+                                            <p className="font-medium">{product.density || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Color:</span>
+                                            <p className="font-medium">{product.color || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Curl Style:</span>
+                                            <p className="font-medium">{product.curlStyle || 'N/A'}</p>
+                                        </div>
                                     </div>
                                     <Separator />
                                     <div className="mt-4">
@@ -226,7 +291,7 @@ export default function RFQDetailClient() {
                                         {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">No quotes submitted yet.</p>}
                                         <div className="space-y-4">
                                             {productQuotes.map(quote => (
-                                                <div key={quote.purchaserId} className={`flex items-center justify-between p-3 rounded-lg ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted/50'}`}>
+                                                <div key={quote.id || quote.purchaserId} className={`flex items-center justify-between p-3 rounded-lg ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted/50'}`}>
                                                     <div className="flex items-center gap-3">
                                                         <Avatar>
                                                             <AvatarImage src={getPurchaser(quote.purchaserId)?.avatar} />
@@ -290,7 +355,7 @@ export default function RFQDetailClient() {
                                 <div className="flex items-center gap-3">
                                     <Avatar>
                                         <AvatarImage src={creator.avatar} />
-                                        <AvatarFallback>{creator.name.charAt(0)}</AvatarFallback>
+                                        <AvatarFallback>{creator.name?.charAt(0)}</AvatarFallback>
                                     </Avatar>
                                     <div>
                                         <p className="font-semibold text-sm">{creator.name}</p>
@@ -300,26 +365,26 @@ export default function RFQDetailClient() {
                             )}
                         </CardContent>
                     </Card>
-                     <Card>
+                    <Card>
                         <CardHeader>
                             <CardTitle>Assigned Purchasers</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {rfq.assignedPurchaserIds.map(id => {
+                            {rfq.assignedPurchaserIds?.map(id => {
                                 const pUser = getPurchaser(id);
                                 if (!pUser) return null;
                                 return (
                                     <div key={id} className="flex items-center gap-3">
-                                         <Avatar className="h-8 w-8">
+                                        <Avatar className="h-8 w-8">
                                             <AvatarImage src={pUser.avatar} />
-                                            <AvatarFallback>{pUser.name.charAt(0)}</AvatarFallback>
+                                            <AvatarFallback>{pUser.name?.charAt(0)}</AvatarFallback>
                                         </Avatar>
                                         <div>
                                             <p className="font-semibold text-sm">{pUser.name}</p>
                                             <p className="text-xs text-muted-foreground">{pUser.email}</p>
                                         </div>
                                     </div>
-                                )
+                                );
                             })}
                         </CardContent>
                     </Card>

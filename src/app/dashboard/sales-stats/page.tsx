@@ -1,24 +1,53 @@
-
 "use client"
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, Pie, PieChart, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { useAuth } from '@/hooks/use-auth';
-import { MOCK_RFQS } from '@/lib/data';
-import { RFQStatus } from '@/lib/types';
+import { RFQStatus, RFQ } from '@/lib/types';
 import { useI18n } from '@/hooks/use-i18n';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const CHART_COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 
 export default function SalesStatsPage() {
     const { user } = useAuth();
     const { t } = useI18n();
+    const [rfqs, setRfqs] = useState<RFQ[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const myRfqs = useMemo(() => {
-        if (!user) return [];
-        return MOCK_RFQS.filter(rfq => rfq.creatorId === user.id);
+    useEffect(() => {
+        const fetchRfqs = async () => {
+            if (!user || !db) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                // Fetch RFQs created by current user
+                const rfqsQuery = query(
+                    collection(db, 'rfqs'),
+                    where('creatorId', '==', user.id)
+                );
+                const snapshot = await getDocs(rfqsQuery);
+                const rfqsData = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as RFQ[];
+                setRfqs(rfqsData);
+            } catch (error) {
+                console.error('Error fetching RFQs:', error);
+                setRfqs([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchRfqs();
     }, [user]);
+
+    const myRfqs = rfqs;
 
     const kpis = useMemo(() => {
         const totalRfqs = myRfqs.length;
@@ -41,7 +70,25 @@ export default function SalesStatsPage() {
     
     const monthlyRfqData = useMemo(() => {
          const monthCounts = myRfqs.reduce((acc, rfq) => {
-            const month = new Date(rfq.inquiryTime).toLocaleString('default', { month: 'short' });
+            const inquiryTime = rfq.inquiryTime;
+            let month: string;
+            
+            // Handle different date formats
+            if (inquiryTime) {
+                let date: Date;
+                if (typeof inquiryTime === 'string') {
+                    date = new Date(inquiryTime);
+                } else if (inquiryTime.toDate) {
+                    // Firestore Timestamp
+                    date = inquiryTime.toDate();
+                } else {
+                    date = new Date();
+                }
+                month = date.toLocaleString('default', { month: 'short' });
+            } else {
+                month = 'Unknown';
+            }
+            
             acc[month] = (acc[month] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);
@@ -55,6 +102,13 @@ export default function SalesStatsPage() {
 
     }, [myRfqs]);
 
+    if (loading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -131,4 +185,3 @@ export default function SalesStatsPage() {
         </div>
     );
 }
-
