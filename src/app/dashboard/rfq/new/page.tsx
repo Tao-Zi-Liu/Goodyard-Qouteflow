@@ -1,4 +1,3 @@
-
 "use client";
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -7,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save, Sparkles, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileEdit, Save, Sparkles, AlertCircle, X } from 'lucide-react';
 import { debounce } from 'lodash';
 
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useI18n } from '@/hooks/use-i18n';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { rfqFormSchema } from '@/lib/schemas';
@@ -30,7 +29,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useNotifications } from '@/hooks/use-notifications';
 import { Textarea } from '@/components/ui/textarea';
 import { getApp } from 'firebase/app';
-import { SimilarQuotesDialog } from '@/components/similar-quotes-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -72,31 +71,37 @@ const generateWlid = async (productSeries: ProductSeries): Promise<string> => {
     return `${prefix}${newSuffix}`;
 };
 
+// Helper function to upload images to Firebase Storage
 const uploadImages = async (files: File[], rfqId: string, productId: string): Promise<string[]> => {
-  if (!storage) {
-      console.error('Firebase Storage not initialized');
-      return [];
-  }
+    if (!storage) {
+        console.error('Firebase Storage not initialized');
+        return [];
+    }
 
-  const uploadPromises = files.map(async (file, index) => {
-      try {
-          const fileName = `rfqs/${rfqId}/${productId}/${Date.now()}_${index}_${file.name}`;
-          const storageRef = ref(storage, fileName);
-          const snapshot = await uploadBytes(storageRef, file);
-          const downloadURL = await getDownloadURL(snapshot.ref);
-          return downloadURL;
-      } catch (error) {
-          console.error('Error uploading image:', error);
-          return null;
-      }
-  });
+    const uploadPromises = files.map(async (file, index) => {
+        try {
+            const fileName = `rfqs/${rfqId}/${productId}/${Date.now()}_${index}_${file.name}`;
+            const storageRef = ref(storage, fileName);
+            const snapshot = await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(snapshot.ref);
+            return downloadURL;
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            return null;
+        }
+    });
 
-  const results = await Promise.all(uploadPromises);
-  return results.filter((url): url is string => url !== null);
+    const results = await Promise.all(uploadPromises);
+    return results.filter((url): url is string => url !== null);
 };
 
-
-function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: { 
+function ProductRow({ 
+    index, 
+    control, 
+    remove, 
+    setValue, 
+    onSimilarQuotesFound 
+}: { 
     index: number, 
     control: any, 
     remove: (index: number) => void, 
@@ -121,7 +126,7 @@ function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: 
 
                 try {
                   const functions = getFunctions(getApp());
-                  const findSimilarQuotesFunction = httpsCallable(functions, 'findsimilarquotes');
+                  const findSimilarQuotesFunction = httpsCallable(functions, 'findSimilarQuotes');
                   const response = await findSimilarQuotesFunction(product);
                   const similarQuotesResult = response.data as { result?: Quote[] };
 
@@ -158,132 +163,134 @@ function ProductRow({ index, control, remove, setValue, onSimilarQuotesFound }: 
 
         setSelectedImages(prev => [...prev, ...files]);
         
+        // Create preview URLs
         const newPreviewUrls = files.map(file => URL.createObjectURL(file));
         setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
         
+        // Store files in form data for later upload
         setValue(`products.${index}.imageFiles`, [...selectedImages, ...files]);
     };
 
     const removeImage = (imageIndex: number) => {
-        const newSelectedImages = selectedImages.filter((_, i) => i !== imageIndex);
-        setSelectedImages(newSelectedImages);
-        const newPreviewUrls = imagePreviewUrls.filter((_, i) => i !== imageIndex);
-        setImagePreviewUrls(newPreviewUrls);
-        setValue(`products.${index}.imageFiles`, newSelectedImages);
+        setSelectedImages(prev => prev.filter((_, i) => i !== imageIndex));
+        setImagePreviewUrls(prev => prev.filter((_, i) => i !== imageIndex));
+        setValue(`products.${index}.imageFiles`, selectedImages.filter((_, i) => i !== imageIndex));
     };
 
     return (
-      <div className="border rounded-lg p-4 space-y-4 relative">
-          <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
-              onClick={() => remove(index)}
-          >
-              <Trash2 className="h-4 w-4" />
-          </Button>
-          <div className="grid sm:grid-cols-1 gap-4">
-              <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Series</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
+        <div className="border rounded-lg p-4 space-y-4 relative">
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                onClick={() => remove(index)}
+            >
+                <Trash2 className="h-4 w-4" />
+            </Button>
+            <div className="grid sm:grid-cols-1 gap-4">
+                <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Product Series</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {productSeriesOptions.map(series => <SelectItem key={series} value={series}>{series}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+                <FormField control={control} name={`products.${index}.wlid`} render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>WLID</FormLabel>
+                    <FormControl>
+                      <Input {...field} readOnly className="bg-muted/50" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={control} name={`products.${index}.sku`} render={({ field }) => (
+                  <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+            </div>
+            <div className="space-y-4">
+              <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
+                <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-              <FormField control={control} name={`products.${index}.wlid`} render={({ field }) => (
-                <FormItem>
-                  <FormLabel>WLID</FormLabel>
-                  <FormControl>
-                    <Input {...field} readOnly className="bg-muted/50" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+              <FormField control={control} name={`products.${index}.cap`} render={({ field }) => (
+                 <FormItem><FormLabel>Cap</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-              <FormField control={control} name={`products.${index}.sku`} render={({ field }) => (
-                <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+               <FormField control={control} name={`products.${index}.capSize`} render={({ field }) => (
+                 <FormItem><FormLabel>Cap Size</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-          </div>
-          <div className="space-y-4">
-            <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
-              <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-            <FormField control={control} name={`products.${index}.cap`} render={({ field }) => (
-               <FormItem><FormLabel>Cap</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-             <FormField control={control} name={`products.${index}.capSize`} render={({ field }) => (
-               <FormItem><FormLabel>Cap Size</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-             <FormField control={control} name={`products.${index}.length`} render={({ field }) => (
-               <FormItem><FormLabel>Length</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-             <FormField control={control} name={`products.${index}.density`} render={({ field }) => (
-               <FormItem><FormLabel>Density</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-             <FormField control={control} name={`products.${index}.color`} render={({ field }) => (
-               <FormItem><FormLabel>Color</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-             <FormField control={control} name={`products.${index}.curlStyle`} render={({ field }) => (
-               <FormItem><FormLabel>Curls</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
-          </div>
-          
-          <FormItem>
-              <FormLabel>Images</FormLabel>
-              <FormControl>
-                  <div className="space-y-4">
-                      <div className="flex items-center justify-center w-full">
-                          <label htmlFor={`dropzone-file-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                  <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
-                                  <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                  <p className="text-xs text-muted-foreground">Each image is limited to 3MB, and a maximum of 5 images can be uploaded</p>
-                              </div>
-                              <Input 
-                                  id={`dropzone-file-${index}`} 
-                                  type="file" 
-                                  className="hidden" 
-                                  multiple 
-                                  accept="image/*"
-                                  onChange={handleImageChange}
-                              />
-                          </label>
-                      </div>
-                      
-                      {imagePreviewUrls.length > 0 && (
-                          <div className="grid grid-cols-5 gap-2">
-                              {imagePreviewUrls.map((url, imgIndex) => (
-                                  <div key={imgIndex} className="relative group">
-                                      <img 
-                                          src={url} 
-                                          alt={`Preview ${imgIndex + 1}`} 
-                                          className="w-full h-20 object-cover rounded-lg"
-                                      />
-                                      <Button
-                                          type="button"
-                                          variant="destructive"
-                                          size="icon"
-                                          className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                          onClick={() => removeImage(imgIndex)}
-                                      >
-                                          <X className="h-3 w-3" />
-                                      </Button>
-                                  </div>
-                              ))}
-                          </div>
-                      )}
-                  </div>
-              </FormControl>
-              <FormMessage />
-          </FormItem>
-      </div>
+               <FormField control={control} name={`products.${index}.length`} render={({ field }) => (
+                 <FormItem><FormLabel>Length</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.density`} render={({ field }) => (
+                 <FormItem><FormLabel>Density</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.color`} render={({ field }) => (
+                 <FormItem><FormLabel>Color</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+               <FormField control={control} name={`products.${index}.curlStyle`} render={({ field }) => (
+                 <FormItem><FormLabel>Curls</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
+            
+            {/* Image Upload Section */}
+            <FormItem>
+                <FormLabel>Images</FormLabel>
+                <FormControl>
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-center w-full">
+                            <label htmlFor={`dropzone-file-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
+                                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                                    <p className="text-xs text-muted-foreground">Each image is limited to 3MB, and a maximum of 5 images can be uploaded</p>
+                                </div>
+                                <Input 
+                                    id={`dropzone-file-${index}`} 
+                                    type="file" 
+                                    className="hidden" 
+                                    multiple 
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                />
+                            </label>
+                        </div>
+                        
+                        {/* Image Previews */}
+                        {imagePreviewUrls.length > 0 && (
+                            <div className="grid grid-cols-5 gap-2">
+                                {imagePreviewUrls.map((url, imgIndex) => (
+                                    <div key={imgIndex} className="relative group">
+                                        <img 
+                                            src={url} 
+                                            alt={`Preview ${imgIndex + 1}`} 
+                                            className="w-full h-20 object-cover rounded-lg"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            size="icon"
+                                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={() => removeImage(imgIndex)}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </FormControl>
+                <FormMessage />
+            </FormItem>
+        </div>
     );
 }
 
@@ -453,67 +460,74 @@ export default function NewRfqPage() {
      try {
         const newRfqCode = `RFQ-${String(rfqCount + 1).padStart(4, '0')}`;
         
-        const newRfqData: Omit<RFQ, 'id' | 'products'> & { code: string } = {
-          code: newRfqCode,
-          customerType: formData.customerType,
-          customerEmail: formData.customerEmail,
-          assignedPurchaserIds: formData.assignedPurchaserIds,
-          inquiryTime: new Date().toISOString(),
-          creatorId: user.id,
-          status: 'Waiting for Quote',
-          quotes: []
-      };
+        // Create RFQ document first to get the ID
+        const newRfqData = {
+            rfqCode: newRfqCode,
+            customerType: formData.customerType,
+            customerEmail: formData.customerEmail,
+            assignedPurchaserIds: formData.assignedPurchaserIds, // This ensures purchaser IDs are saved
+            products: [], // Will update with image URLs
+            inquiryTime: serverTimestamp(),
+            creatorId: user.id,
+            status: 'Waiting for Quote',
+            quotes: [] // Initialize empty quotes array
+        };
 
         const docRef = await addDoc(collection(db, "rfqs"), newRfqData);
         const newRfqId = docRef.id;
 
+        // Upload images for each product and update products with image URLs
         const productsWithImages = await Promise.all(
-          formData.products.map(async (product: any) => {
-              let imageUrls: string[] = [];
-              
-              if (product.imageFiles && product.imageFiles.length > 0) {
-                  imageUrls = await uploadImages(product.imageFiles, newRfqId, product.id);
-              }
-              
-              const { imageFiles, ...productData } = product;
-              return {
-                  ...productData,
-                  images: imageUrls
-              };
-          })
-      );
+            formData.products.map(async (product: any) => {
+                let imageUrls: string[] = [];
+                
+                // Check if there are image files to upload
+                if (product.imageFiles && product.imageFiles.length > 0) {
+                    imageUrls = await uploadImages(product.imageFiles, newRfqId, product.id);
+                }
+                
+                // Remove imageFiles from the product object and add imageUrls
+                const { imageFiles, ...productData } = product;
+                return {
+                    ...productData,
+                    images: imageUrls
+                };
+            })
+        );
 
-      await updateDoc(doc(db, "rfqs", newRfqId), {
-          products: productsWithImages
-      });
+        // Update the RFQ document with products that have image URLs
+        await updateDoc(doc(db, "rfqs", newRfqId), {
+            products: productsWithImages
+        });
 
+        // Send notifications to assigned purchasers
         for (const purchaserId of formData.assignedPurchaserIds) {
-          await createNotification({
-              recipientId: purchaserId,
-              titleKey: 'notification_new_rfq_title',
-              bodyKey: 'notification_new_rfq_body',
-              bodyParams: { rfqCode: newRfqCode, salesName: user.name },
-              href: `/dashboard/rfq/${newRfqId}`,
-          });
-      }
+            await createNotification({
+                recipientId: purchaserId,
+                titleKey: 'notification_new_rfq_title',
+                bodyKey: 'notification_new_rfq_body',
+                bodyParams: { rfqCode: newRfqCode, salesName: user.name },
+                href: `/dashboard/rfq/${newRfqId}`,
+            });
+        }
 
-      toast({
-          title: "RFQ Created",
-          description: "The new RFQ has been successfully created and purchasers have been notified.",
-      });
-      setIsPreviewOpen(false);
-      router.push('/dashboard');
-   } catch (error) {
-       console.error("Error creating RFQ: ", error);
-       toast({
-           variant: "destructive",
-           title: "Error",
-           description: "There was an error creating the RFQ. Please try again.",
-       });
-   } finally {
-       setIsSaving(false);
-   }
-};
+        toast({
+            title: "RFQ Created",
+            description: "The new RFQ has been successfully created and purchasers have been notified.",
+        });
+        setIsPreviewOpen(false);
+        router.push('/dashboard');
+     } catch (error) {
+         console.error("Error creating RFQ: ", error);
+         toast({
+             variant: "destructive",
+             title: "Error",
+             description: "There was an error creating the RFQ. Please try again.",
+         });
+     } finally {
+         setIsSaving(false);
+     }
+  };
 
   const addProduct = async () => {
     const newProductSeries: ProductSeries = 'Wig';
