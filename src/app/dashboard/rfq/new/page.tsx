@@ -18,7 +18,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useI18n } from '@/hooks/use-i18n';
 import { useToast } from '@/hooks/use-toast';
-import { collection, addDoc, serverTimestamp, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, getDocs, query, where,updateDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { rfqFormSchema } from '@/lib/schemas';
@@ -70,7 +70,6 @@ const generateWlid = async (productSeries: ProductSeries): Promise<string> => {
     const newSuffix = (maxSuffix + 1).toString().padStart(4, '0');
     return `${prefix}${newSuffix}`;
 };
-
 // Helper function to upload images to Firebase Storage
 const uploadImages = async (files: File[], rfqId: string, productId: string): Promise<string[]> => {
     if (!storage) {
@@ -528,6 +527,7 @@ export default function NewRfqPage() {
          setIsSaving(false);
      }
   };
+  const [isSaving, setIsSaving] = useState(false);
 
   const addProduct = async () => {
     const newProductSeries: ProductSeries = 'Wig';
@@ -747,7 +747,16 @@ export default function NewRfqPage() {
               <FileEdit className="mr-2 h-4 w-4" /> Edit
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
-              <Save className="mr-2 h-4 w-4" /> {isSaving ? "Saving..." : "Save RFQ"}
+              {isSaving ? (
+              <>
+                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div>
+                Saving...
+                </>
+            ) : (
+            <>
+            <Save className="mr-2 h-4 w-4" /> Save RFQ
+            </>
+            )}
             </Button>
           </DialogFooter>
         </DialogContent>

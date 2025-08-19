@@ -40,14 +40,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email!,
           name: userData.name || firebaseUser.displayName || 'User',
           role: userData.role || 'Sales',
-          registrationDate: userData.registrationDate?.toDate?.()?.toISOString() || firebaseUser.metadata.creationTime!,
+          registrationDate: userData.registrationDate?.toDate?.()?.toISOString() || 
+                          userData.registrationDate || 
+                          firebaseUser.metadata.creationTime!,
           lastLoginTime: userData.lastLoginTime,
           status: userData.status || 'Active',
           language: userData.language || 'en',
           avatar: userData.avatar || firebaseUser.photoURL || 'https://placehold.co/100x100',
           mustChangePassword: userData.mustChangePassword || false,
           createdBy: userData.createdBy,
-          createdAt: userData.createdAt?.toDate?.()?.toISOString(),
+          createdAt: userData.createdAt?.toDate?.()?.toISOString() || userData.createdAt,
         };
       }
       return null;
@@ -79,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe = onAuthStateChanged(
         auth, 
         async (firebaseUser) => {
+          console.log('Auth state changed:', firebaseUser?.email || 'null');
+          
           try {
             if (firebaseUser) {
               const userData = await getUserData(firebaseUser);
@@ -88,6 +92,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (typeof window !== 'undefined') {
                   localStorage.setItem('user', JSON.stringify(userData));
                   localStorage.setItem('lang', userData.language);
+                }
+              } else {
+                // Create user document if it doesn't exist
+                console.log('Creating user document for authenticated user');
+                const newUserData = {
+                  email: firebaseUser.email,
+                  name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+                  role: 'Sales',
+                  registrationDate: new Date().toISOString(),
+                  status: 'Active',
+                  language: 'en',
+                  avatar: 'https://placehold.co/100x100',
+                  lastLoginTime: new Date().toISOString()
+                };
+                
+                await setDoc(doc(db, 'users', firebaseUser.uid), newUserData);
+                
+                // Fetch the user data again
+                const createdUserData = await getUserData(firebaseUser);
+                if (createdUserData) {
+                  setUser(createdUserData);
+                  if (typeof window !== 'undefined') {
+                    localStorage.setItem('user', JSON.stringify(createdUserData));
+                    localStorage.setItem('lang', createdUserData.language);
+                  }
                 }
               }
             } else {
@@ -128,22 +157,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    console.log('Attempting login for:', email);
     setLoading(true);
+    
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Firebase auth successful for:', userCredential.user.email);
+      
       const userData = await getUserData(userCredential.user);
       
-      if (userData) {
-        // Update last login time in Firestore
+      if (!userData) {
+        // Create user document if it doesn't exist
+        console.log('Creating user document for:', userCredential.user.email);
+        const newUserData = {
+          email: userCredential.user.email,
+          name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || 'User',
+          role: 'Sales',
+          registrationDate: new Date().toISOString(),
+          status: 'Active',
+          language: 'en',
+          avatar: 'https://placehold.co/100x100',
+          lastLoginTime: new Date().toISOString()
+        };
+        
+        await setDoc(doc(db, 'users', userCredential.user.uid), newUserData);
+      } else {
+        // Update last login time
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           lastLoginTime: new Date().toISOString()
         }, { merge: true });
-        
-        return true;
       }
-      return false;
-    } catch (error) {
+      
+      // The onAuthStateChanged listener will handle setting the user state
+      return true;
+    } catch (error: any) {
       console.error('Login error:', error);
+      console.error('Error code:', error?.code);
+      console.error('Error message:', error?.message);
       setLoading(false);
       return false;
     }

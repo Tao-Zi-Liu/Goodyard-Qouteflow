@@ -22,6 +22,13 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    console.log('=== Login Debug ===');
+    console.log('Email:', email);
+    console.log('Password length:', password.length);
+    console.log('Auth initialized:', !!auth);
+    console.log('DB initialized:', !!db);
+    
     if (!email || !password) {
       toast({
         variant: "destructive",
@@ -33,14 +40,19 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
+      console.log('Calling login function...');
       const success = await login(email, password);
+      console.log('Login result:', success);
+      
       if (success) {
+        console.log('Success! Redirecting...');
         toast({
           title: "Login Successful",
           description: "Welcome back!",
         });
         router.push('/dashboard');
       } else {
+        console.log('Login returned false');
         toast({
           variant: "destructive",
           title: "Login Failed",
@@ -48,15 +60,16 @@ export default function LoginPage() {
         });
       }
     } catch (error: any) {
+      console.error('Caught error:', error);
       toast({
         variant: "destructive",
         title: "Login Error",
-        description: "An error occurred during login. Please try again.",
+        description: error?.message || "An error occurred during login. Please try again.",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+};
 
   if (!isLoaded) {
      return <div className="flex h-screen w-full items-center justify-center bg-background"></div>;
