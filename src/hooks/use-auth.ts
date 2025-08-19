@@ -1,12 +1,34 @@
 
-"use client";
-import { useContext } from 'react';
-import { AuthContext, type AuthContextType } from '@/contexts/auth-context';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import { app } from '@/lib/firebase'; // Ensure you import your initialized Firebase app
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+// --- THIS IS THE CRITICAL PART THAT IS LIKELY MISSING OR INCORRECT ---
+const auth = getAuth(app);
+// ---------------------------------------------------------------------
+
+export const useAuth = () => {
+  // ... other state and functions
+
+  const login = async (email, password) => {
+    try {
+      // The 'auth' object is now defined and available here
+      await signInWithEmailAndPassword(auth, email, password);
+      return true; // Indicate success
+    } catch (error) {
+      console.error("Authentication error in useAuth:", error);
+      return false; // Indicate failure
+    }
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+  };
+  
+  // ... rest of the hook (e.g., useEffect with onAuthStateChanged)
+
+  return {
+    // ... other values
+    login,
+    logout,
+  };
 };

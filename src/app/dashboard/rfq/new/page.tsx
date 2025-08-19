@@ -527,7 +527,6 @@ export default function NewRfqPage() {
          setIsSaving(false);
      }
   };
-  const [isSaving, setIsSaving] = useState(false);
 
   const addProduct = async () => {
     const newProductSeries: ProductSeries = 'Wig';
