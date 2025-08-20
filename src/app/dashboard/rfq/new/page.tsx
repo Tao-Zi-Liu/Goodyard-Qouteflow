@@ -197,14 +197,6 @@ function ProductRow({
         setValue(`products.${index}.imageFiles`, selectedImages.filter((_, i) => i !== imageIndex));
     };
 
-    const updateProductImages = (productId: string, files: File[]) => {
-      setProductImages(prev => ({
-        ...prev,
-        [productId]: files
-      }));
-      console.log('📦 Stored images for product:', productId, 'Files:', files.length);
-    };
-
     return (
         <div className="border rounded-lg p-4 space-y-4 relative">
             <Button
@@ -426,6 +418,7 @@ export default function NewRfqPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { createNotification } = useNotifications();
+  const [productImages, setProductImages] = useState<{[productId: string]: File[]}>({});
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [formData, setFormData] = useState<RfqFormValues | null>(null);
@@ -474,6 +467,14 @@ export default function NewRfqPage() {
     setSimilarQuotes(quotes);
     setIsSimilarQuotesDialogOpen(true);
   }, []);
+
+  const updateProductImages = (productId: string, files: File[]) => {
+    setProductImages(prev => ({
+      ...prev,
+      [productId]: files
+    }));
+    console.log('📦 Stored images for product:', productId, 'Files:', files.length);
+  };
 
   const defaultProductSeries: ProductSeries = 'Wig';
   const [defaultWlid, setDefaultWlid] = useState<string>('');
@@ -560,6 +561,11 @@ const handleSave = async () => {
           id: p.id,
           imageFilesCount: p.imageFiles?.length || 0
       })));
+
+      // Debug: Log all product IDs and stored images
+        console.log('🔍 Product IDs in formData:', formData.products.map(p => p.id));
+        console.log('🔍 Stored productImages keys:', Object.keys(productImages));
+        console.log('🔍 Full productImages state:', productImages);
 
       // Upload images for each product using the direct form values
       const productsWithImages = await Promise.all(
@@ -693,7 +699,7 @@ const handleSave = async () => {
                         setValue={form.setValue}
                         onSimilarQuotesFound={handleSimilarQuotesFound}
                         updateProductImages={updateProductImages}
-                        productId={field.id}
+                        productId={form.watch(`products.${index}.id`) || field.id}
                         />
                     ))}
                     <Button type="button" variant="outline" onClick={addProduct}>
