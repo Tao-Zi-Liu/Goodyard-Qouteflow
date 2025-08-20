@@ -14,8 +14,8 @@ const productSchema = z.object({
   color: z.string().min(1, 'Color is required'),
   curlStyle: z.string().min(1, 'Curls are required'),
   images: z.any(), // Keeping it simple for now
+  imageFiles: z.any().optional(),
 });
-
 export const rfqFormSchema = z.object({
   customerType: z.string(),
   customerEmail: z.string().email('Invalid email address'),

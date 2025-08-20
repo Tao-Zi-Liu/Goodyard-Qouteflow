@@ -26,8 +26,6 @@ export default function LoginPage() {
     console.log('=== Login Debug ===');
     console.log('Email:', email);
     console.log('Password length:', password.length);
-    console.log('Auth initialized:', !!auth);
-    console.log('DB initialized:', !!db);
     
     if (!email || !password) {
       toast({

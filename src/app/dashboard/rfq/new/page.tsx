@@ -16,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { SimilarQuotesDialog } from '@/components/similar-quotes-dialog';
+
 import { useI18n } from '@/hooks/use-i18n';
 import { useToast } from '@/hooks/use-toast';
 import { collection, addDoc, serverTimestamp, getDocs, query, where,updateDoc, doc } from 'firebase/firestore';
@@ -99,22 +101,37 @@ function ProductRow({
     control, 
     remove, 
     setValue, 
-    onSimilarQuotesFound 
+    onSimilarQuotesFound,
+    updateProductImages,
+    productId
 }: { 
     index: number, 
     control: any, 
     remove: (index: number) => void, 
     setValue: any, 
     onSimilarQuotesFound: (quotes: Quote[]) => void 
+    updateProductImages: (productId: string, files: File[]) => void,
+    productId: string
 }) {
     const productData = useWatch({
         control,
         name: `products.${index}`,
     });
-
+    const imageFiles = useWatch({
+      control,
+      name: `products.${index}.imageFiles`,
+  });
+  
+  // Add this useEffect to sync the watched files
+  useEffect(() => {
+      if (imageFiles && imageFiles.length > 0) {
+          console.log('👀 Watched imageFiles changed:', imageFiles.length);
+      }
+  }, [imageFiles]);    
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
-
+    const [productImages, setProductImages] = useState<{[productId: string]: File[]}>({});
+/*
     const debouncedFindQuotes = useMemo(
         () =>
             debounce(async (product: Product) => {
@@ -138,13 +155,13 @@ function ProductRow({
             }, 1000),
         [onSimilarQuotesFound]
     );
-
+  
     useEffect(() => {
         if(productData) {
             debouncedFindQuotes(productData);
         }
     }, [productData, debouncedFindQuotes]);
-
+*/
     useEffect(() => {
         if (productData?.productSeries) {
             generateWlid(productData.productSeries).then(newWlid => {
@@ -153,6 +170,7 @@ function ProductRow({
         }
     }, [productData?.productSeries, index, setValue]);
 
+  /*  
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length + selectedImages.length > 5) {
@@ -167,13 +185,24 @@ function ProductRow({
         setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
         
         // Store files in form data for later upload
-        setValue(`products.${index}.imageFiles`, [...selectedImages, ...files]);
+        const newFiles = [...selectedImages, ...files];
+        setValue(`products.${index}.imageFiles`, newFiles, { shouldValidate: true, shouldDirty: true });
+        console.log('💾 Saved image files:', newFiles);
+        console.log('📝 Form field updated:', `products.${index}.imageFiles`);
     };
-
+  */
     const removeImage = (imageIndex: number) => {
         setSelectedImages(prev => prev.filter((_, i) => i !== imageIndex));
         setImagePreviewUrls(prev => prev.filter((_, i) => i !== imageIndex));
         setValue(`products.${index}.imageFiles`, selectedImages.filter((_, i) => i !== imageIndex));
+    };
+
+    const updateProductImages = (productId: string, files: File[]) => {
+      setProductImages(prev => ({
+        ...prev,
+        [productId]: files
+      }));
+      console.log('📦 Stored images for product:', productId, 'Files:', files.length);
     };
 
     return (
@@ -239,56 +268,82 @@ function ProductRow({
               )} />
             </div>
             
-            {/* Image Upload Section */}
-            <FormItem>
-                <FormLabel>Images</FormLabel>
-                <FormControl>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-center w-full">
-                            <label htmlFor={`dropzone-file-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
-                                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                                    <p className="text-xs text-muted-foreground">Each image is limited to 3MB, and a maximum of 5 images can be uploaded</p>
-                                </div>
-                                <Input 
-                                    id={`dropzone-file-${index}`} 
-                                    type="file" 
-                                    className="hidden" 
-                                    multiple 
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                />
-                            </label>
+{/* Image Upload Section */}
+<FormField
+  control={control}
+  name={`products.${index}.imageFiles`}
+  render={({ field }) => (
+    <FormItem>
+        <FormLabel>Images</FormLabel>
+        <FormControl>
+            <div className="space-y-4">
+                <div className="flex items-center justify-center w-full">
+                    <label htmlFor={`dropzone-file-${index}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
+                            <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p className="text-xs text-muted-foreground">Each image is limited to 3MB, and a maximum of 5 images can be uploaded</p>
                         </div>
-                        
-                        {/* Image Previews */}
-                        {imagePreviewUrls.length > 0 && (
-                            <div className="grid grid-cols-5 gap-2">
-                                {imagePreviewUrls.map((url, imgIndex) => (
-                                    <div key={imgIndex} className="relative group">
-                                        <img 
-                                            src={url} 
-                                            alt={`Preview ${imgIndex + 1}`} 
-                                            className="w-full h-20 object-cover rounded-lg"
-                                        />
-                                        <Button
-                                            type="button"
-                                            variant="destructive"
-                                            size="icon"
-                                            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            onClick={() => removeImage(imgIndex)}
-                                        >
-                                            <X className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                ))}
+                        <Input 
+                            id={`dropzone-file-${index}`} 
+                            type="file" 
+                            className="hidden" 
+                            multiple 
+                            accept="image/*"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length + selectedImages.length > 5) {
+                                  alert('Maximum 5 images allowed per product');
+                                  return;
+                              }
+                              
+                              const newFiles = [...selectedImages, ...files];
+                              setSelectedImages(newFiles);
+                              
+                              // Create preview URLs
+                              const newPreviewUrls = files.map(file => URL.createObjectURL(file));
+                              setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+                              
+                              // Update the form field
+                              field.onChange(newFiles);
+                              console.log('💾 Form field updated with files:', newFiles);
+                              
+                              // Store in separate state
+                              updateProductImages(productId, newFiles);
+                          }}
+                        />
+                    </label>
+                </div>
+                
+                {/* Image Previews */}
+                {imagePreviewUrls.length > 0 && (
+                    <div className="grid grid-cols-5 gap-2">
+                        {imagePreviewUrls.map((url, imgIndex) => (
+                            <div key={imgIndex} className="relative group">
+                                <img 
+                                    src={url} 
+                                    alt={`Preview ${imgIndex + 1}`} 
+                                    className="w-full h-20 object-cover rounded-lg"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="icon"
+                                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => removeImage(imgIndex)}
+                                >
+                                    <X className="h-3 w-3" />
+                                </Button>
                             </div>
-                        )}
+                        ))}
                     </div>
-                </FormControl>
-                <FormMessage />
-            </FormItem>
+                )}
+            </div>
+        </FormControl>
+        <FormMessage />
+    </FormItem>
+  )}
+/>
         </div>
     );
 }
@@ -307,9 +362,21 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
         }
         setIsLoading(true);
         try {
-            const functions = getFunctions(getApp());
-            const extractRfqDataFunction = httpsCallable(functions, 'extractrfq');
-            const result = await extractRfqDataFunction({ inputText: text });
+    // TODO: Re-enable AI extraction when functions are properly configured
+    // const functions = getFunctions(getApp());
+    // const extractRfqDataFunction = httpsCallable(functions, 'extractrfq');
+    // const result = await extractRfqDataFunction({ inputText: text });
+    
+    // Mock response for now
+    const Result = {
+      data: {
+          customerEmail: "extracted@example.com",
+          products: [{
+              productSeries: "Wig",
+              description: text
+          }]
+      }
+  };
             onApply(result.data);
             setIsOpen(false);
             toast({ title: 'Extraction Successful', description: 'The form has been pre-filled with the extracted data.' });
@@ -448,85 +515,109 @@ export default function NewRfqPage() {
   });
 
   const onPreview = (data: RfqFormValues) => {
+    // Get the current form values directly
+    const currentFormData = form.getValues();
+    console.log('📋 Direct form values:', currentFormData);
+    console.log('📋 Form data from submit:', data);
+    
+    // Check if imageFiles exist in either source
+    console.log('📋 Products with images (direct):', currentFormData.products.map(p => ({ 
+        id: p.id, 
+        imageCount: p.imageFiles?.length || 0,
+        hasImageFiles: !!p.imageFiles 
+    })));
+    
     setFormData(data);
     setIsPreviewOpen(true);
-  };
+};
 
-  const handleSave = async () => {
-     if (!formData || !user) return;
+const handleSave = async () => {
+  if (!formData || !user) return;
 
-     setIsSaving(true);
-     try {
-        const newRfqCode = `RFQ-${String(rfqCount + 1).padStart(4, '0')}`;
-        
-        // Create RFQ document first to get the ID
-        const newRfqData = {
-            rfqCode: newRfqCode,
-            customerType: formData.customerType,
-            customerEmail: formData.customerEmail,
-            assignedPurchaserIds: formData.assignedPurchaserIds, // This ensures purchaser IDs are saved
-            products: [], // Will update with image URLs
-            inquiryTime: serverTimestamp(),
-            creatorId: user.id,
-            status: 'Waiting for Quote',
-            quotes: [] // Initialize empty quotes array
-        };
+  setIsSaving(true);
+  try {
+      const newRfqCode = `RFQ-${String(rfqCount + 1).padStart(4, '0')}`;
+      
+      // Create RFQ document first to get the ID
+      const newRfqData = {
+          rfqCode: newRfqCode,
+          customerType: formData.customerType,
+          customerEmail: formData.customerEmail,
+          assignedPurchaserIds: formData.assignedPurchaserIds,
+          products: [], // Will update with image URLs
+          inquiryTime: serverTimestamp(),
+          creatorId: user.id,
+          status: 'Waiting for Quote',
+          quotes: []
+      };
 
-        const docRef = await addDoc(collection(db, "rfqs"), newRfqData);
-        const newRfqId = docRef.id;
+      const docRef = await addDoc(collection(db, "rfqs"), newRfqData);
+      const newRfqId = docRef.id;
 
-        // Upload images for each product and update products with image URLs
-        const productsWithImages = await Promise.all(
-            formData.products.map(async (product: any) => {
-                let imageUrls: string[] = [];
-                
-                // Check if there are image files to upload
-                if (product.imageFiles && product.imageFiles.length > 0) {
-                    imageUrls = await uploadImages(product.imageFiles, newRfqId, product.id);
-                }
-                
-                // Remove imageFiles from the product object and add imageUrls
-                const { imageFiles, ...productData } = product;
-                return {
-                    ...productData,
-                    images: imageUrls
-                };
-            })
-        );
+      // Get the current form values directly (this includes imageFiles)
+      const currentFormValues = form.getValues();
+      console.log('🔍 Getting files from form values:', currentFormValues.products.map(p => ({
+          id: p.id,
+          imageFilesCount: p.imageFiles?.length || 0
+      })));
 
-        // Update the RFQ document with products that have image URLs
-        await updateDoc(doc(db, "rfqs", newRfqId), {
-            products: productsWithImages
-        });
+      // Upload images for each product using the direct form values
+      const productsWithImages = await Promise.all(
+        formData.products.map(async (product: any) => {
+            console.log('🖼️ Processing product:', product.id);
+            
+            // Get files from separate state instead of form
+            const imageFiles = productImages[product.id] || [];
+            console.log('📁 Image files found:', imageFiles.length);
+            
+            let imageUrls: string[] = [];
+            
+            if (imageFiles.length > 0) {
+                console.log('⬆️ Starting upload for', imageFiles.length, 'files');
+                imageUrls = await uploadImages(imageFiles, newRfqId, product.id);
+                console.log('✅ Upload result:', imageUrls);
+            }
+            
+            return {
+                ...product,
+                images: imageUrls
+            };
+        })
+    );
 
-        // Send notifications to assigned purchasers
-        for (const purchaserId of formData.assignedPurchaserIds) {
-            await createNotification({
-                recipientId: purchaserId,
-                titleKey: 'notification_new_rfq_title',
-                bodyKey: 'notification_new_rfq_body',
-                bodyParams: { rfqCode: newRfqCode, salesName: user.name },
-                href: `/dashboard/rfq/${newRfqId}`,
-            });
-        }
+      // Update the RFQ document with products that have image URLs
+      await updateDoc(doc(db, "rfqs", newRfqId), {
+          products: productsWithImages
+      });
 
-        toast({
-            title: "RFQ Created",
-            description: "The new RFQ has been successfully created and purchasers have been notified.",
-        });
-        setIsPreviewOpen(false);
-        router.push('/dashboard');
-     } catch (error) {
-         console.error("Error creating RFQ: ", error);
-         toast({
-             variant: "destructive",
-             title: "Error",
-             description: "There was an error creating the RFQ. Please try again.",
-         });
-     } finally {
-         setIsSaving(false);
-     }
-  };
+      // Send notifications to assigned purchasers
+      for (const purchaserId of formData.assignedPurchaserIds) {
+          await createNotification({
+              recipientId: purchaserId,
+              titleKey: 'notification_new_rfq_title',
+              bodyKey: 'notification_new_rfq_body',
+              bodyParams: { rfqCode: newRfqCode, salesName: user.name },
+              href: `/dashboard/rfq/${newRfqId}`,
+          });
+      }
+
+      toast({
+          title: "RFQ Created",
+          description: "The new RFQ has been successfully created and purchasers have been notified.",
+      });
+      setIsPreviewOpen(false);
+      router.push('/dashboard');
+  } catch (error) {
+      console.error("Error creating RFQ: ", error);
+      toast({
+          variant: "destructive",
+          title: "Error",
+          description: "There was an error creating the RFQ. Please try again.",
+      });
+  } finally {
+      setIsSaving(false);
+  }
+};
 
   const addProduct = async () => {
     const newProductSeries: ProductSeries = 'Wig';
@@ -601,6 +692,8 @@ export default function NewRfqPage() {
                         remove={remove}
                         setValue={form.setValue}
                         onSimilarQuotesFound={handleSimilarQuotesFound}
+                        updateProductImages={updateProductImages}
+                        productId={field.id}
                         />
                     ))}
                     <Button type="button" variant="outline" onClick={addProduct}>

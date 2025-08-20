@@ -29,6 +29,7 @@ export default function RFQDetailClient() {
     const [rfq, setRfq] = useState<RFQ | null>(null);
     const [creator, setCreator] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [users, setUsers] = useState<any[]>([]);
 
     useEffect(() => {
         const fetchRfq = async () => {
@@ -52,6 +53,7 @@ export default function RFQDetailClient() {
                         id: doc.id,
                         ...doc.data()
                     }));
+                    setUsers(users);
                     
                     const foundCreator = users.find(u => u.id === rfqData.creatorId);
                     setCreator(foundCreator || null);
@@ -70,7 +72,7 @@ export default function RFQDetailClient() {
         fetchRfq();
     }, [params.id, router, toast]);
 
-    const getPurchaser = (purchaserId: string) => MOCK_USERS.find(u => u.id === purchaserId);
+    const getPurchaser = (purchaserId: string) => users.find(u => u.id === purchaserId);
 
     const getStatusVariant = (status: RFQStatus) => {
         switch (status) {
