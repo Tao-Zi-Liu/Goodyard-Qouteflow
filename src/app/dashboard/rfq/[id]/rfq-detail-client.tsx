@@ -1,7 +1,6 @@
 "use client";
 
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -210,6 +209,9 @@ export default function RFQDetailClient() {
         return (
           <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
             <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+            <DialogHeader className="sr-only">
+            <DialogTitle>Product Image</DialogTitle>
+          </DialogHeader>
               <div className="relative">
                 <img 
                   src={selectedImage} 
