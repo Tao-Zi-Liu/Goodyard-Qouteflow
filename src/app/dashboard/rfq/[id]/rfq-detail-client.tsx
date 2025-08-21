@@ -1,10 +1,12 @@
 "use client";
 
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import { ArrowLeft, Edit, CheckCircle, Clock, Send, XCircle } from 'lucide-react';
+import { ArrowLeft, Edit, CheckCircle, Clock, Send, XCircle, Eye, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -30,6 +32,8 @@ export default function RFQDetailClient() {
     const [creator, setCreator] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<any[]>([]);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchRfq = async () => {
@@ -44,6 +48,13 @@ export default function RFQDetailClient() {
                         // IMPORTANT: Ensure quotes always exists as an array
                         quotes: docSnap.data().quotes || []
                     } as RFQ;
+                    console.log('📸 RFQ Products with images:', rfqData.products.map(p => ({
+                        id: p.id,
+                        sku: p.sku,
+                        imageCount: p.images?.length || 0,
+                        images: p.images
+                    })));
+                    
                     setRfq(rfqData);
                     
                     // Replace MOCK_USERS with actual user fetching from Firestore
@@ -193,6 +204,32 @@ export default function RFQDetailClient() {
         }
     };
 
+    const ImageModal = () => {
+        if (!selectedImage) return null;
+        
+        return (
+          <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+              <div className="relative">
+                <img 
+                  src={selectedImage} 
+                  alt="Product image"
+                  className="w-full h-full object-contain"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+                  onClick={() => setIsImageModalOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      };
+    
     if (loading) {
         return (
             <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -253,6 +290,11 @@ export default function RFQDetailClient() {
                                     <CardDescription>WLID: {product.wlid}</CardDescription>
                                 </CardHeader>
                                 <CardContent>
+                                {product.imageUrl && (
+                                <div className="mb-6 flex justify-center">
+                                <img src={product.imageUrl} alt={product.sku} className="max-h-60 object-contain rounded-md" />
+                                </div>
+                                )}
                                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
                                         <div>
                                             <span className="text-muted-foreground">Product Series:</span>
@@ -287,6 +329,35 @@ export default function RFQDetailClient() {
                                             <p className="font-medium">{product.curlStyle || 'N/A'}</p>
                                         </div>
                                     </div>
+                                    {/* Add Image Display Section */}
+                                    {product.images && product.images.length > 0 && (
+                                       <div className="mt-4 mb-6">
+                                        <span className="text-sm text-muted-foreground">Product Images:</span>
+                                        <div className="grid grid-cols-4 gap-2 mt-2">
+                                        {product.images.map((imageUrl, index) => (
+                                        <div 
+                                          key={index} 
+                                          className="relative group cursor-pointer"
+                                          onClick={() => {
+                                            setSelectedImage(imageUrl);
+                                            setIsImageModalOpen(true);
+                                          }}
+                                        >
+                                        <img 
+                                            src={imageUrl} 
+                                            alt={`Product ${index + 1}`}
+                                            className="w-full h-24 object-cover rounded-lg border hover:opacity-75 transition-opacity"
+                                            />
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="bg-black/50 rounded-full p-2">
+                                                <Eye className="h-4 w-4 text-white" />
+                                            </div>
+                                        </div>
+                                        </div>
+                                        ))}
+                                            </div>
+                                        </div>
+                                    )}
                                     <Separator />
                                     <div className="mt-4">
                                         <h4 className="font-semibold mb-2">Quotes</h4>
@@ -392,6 +463,8 @@ export default function RFQDetailClient() {
                     </Card>
                 </div>
             </div>
+                    <ImageModal />
+
         </div>
     );
 }
