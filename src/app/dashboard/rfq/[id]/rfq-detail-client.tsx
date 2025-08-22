@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import { ArrowLeft, Edit, CheckCircle, Clock, Send, XCircle, Eye, X, Upload } from 'lucide-react';
+import { ArrowLeft, Edit, CheckCircle, Send, XCircle, Eye, X, Upload } from 'lucide-react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -15,6 +15,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { rfqFormSchema } from '@/lib/schemas';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
+import { Lock, Unlock, History, Clock } from 'lucide-react';
+import { serverTimestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -28,6 +30,27 @@ import type { RFQ, Quote, RFQStatus, Product } from '@/lib/types';
 import { QuoteDialog } from '@/components/quote-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
+
+const formatFirestoreDate = (date: any): string => {
+    if (!date) return 'N/A';
+    
+    // Handle Firestore timestamp
+    if (date.seconds) {
+        return new Date(date.seconds * 1000).toLocaleString();
+    }
+    
+    // Handle regular Date object or ISO string
+    if (date instanceof Date) {
+        return date.toLocaleString();
+    }
+    
+    // Handle ISO string
+    if (typeof date === 'string') {
+        return new Date(date).toLocaleString();
+    }
+    
+    return 'N/A';
+};
 
 export default function RFQDetailClient() {
     const params = useParams();
@@ -118,6 +141,7 @@ export default function RFQDetailClient() {
     const getStatusVariant = (status: RFQStatus) => {
         switch (status) {
             case 'Waiting for Quote': return 'secondary';
+            case 'Locked': return 'destructive';
             case 'Quotation in Progress': return 'default';
             case 'Quotation Completed': return 'outline';
             case 'Archived': return 'destructive';
@@ -175,6 +199,106 @@ export default function RFQDetailClient() {
         }
     };
 
+    const addActionHistory = async (rfqId: string, actionType: string, details?: any) => {
+        if (!user) return;
+        
+        try {
+            const rfqRef = doc(db, "rfqs", rfqId);
+            
+            const newAction = {
+                id: `action-${Date.now()}`,
+                rfqId,
+                actionType,
+                performedBy: user.id,
+                performedByName: user.name,
+                timestamp: new Date().toISOString(),
+                details: details || {}
+            };
+    
+            const updatedHistory = [...(rfq?.actionHistory || []), newAction];
+    
+            await updateDoc(rfqRef, {
+                actionHistory: updatedHistory
+            });
+    
+            // Update local state
+            if (rfq) {
+                setRfq({ ...rfq, actionHistory: updatedHistory });
+            }
+        } catch (error) {
+            console.error('Error adding action history:', error);
+        }
+    };
+    
+    const handleLockToggle = async () => {
+        if (!rfq || !user || user.role !== 'Purchasing') return;
+        if (!rfq.assignedPurchaserIds.includes(user.id)) return;
+    
+        try {
+            const isCurrentlyLocked = rfq.status === 'Locked';
+            
+            const updates: any = {
+                status: isCurrentlyLocked ? 'Waiting for Quote' : 'Locked',
+                updatedAt: serverTimestamp()
+            };
+    
+            if (!isCurrentlyLocked) {
+                // Locking the RFQ
+                updates.lockedBy = user.id;
+                updates.lockedAt = serverTimestamp();
+            } else {
+                // Unlocking the RFQ
+                updates.lockedBy = null;
+                updates.lockedAt = null;
+            }
+    
+            const docRef = doc(db, "rfqs", rfq.id);
+            await updateDoc(docRef, updates);
+    
+            // Update local state
+            setRfq(prev => prev ? {
+                ...prev,
+                status: isCurrentlyLocked ? 'Waiting for Quote' : 'Locked',
+                lockedBy: isCurrentlyLocked ? undefined : user.id,
+                lockedAt: isCurrentlyLocked ? undefined : new Date().toISOString()
+            } : null);
+    
+            // Add to action history
+            await addActionHistory(
+                rfq.id, 
+                isCurrentlyLocked ? 'rfq_unlocked' : 'rfq_locked',
+                {
+                    previousStatus: rfq.status,
+                    newStatus: isCurrentlyLocked ? 'Waiting for Quote' : 'Locked'
+                }
+            );
+
+            await addActionHistory(
+                rfq.id, 
+                isUpdate ? 'quote_updated' : 'quote_submitted',
+                {
+                    productId,
+                    quoteId: isUpdate ? existingQuote?.id : `quote-${Date.now()}`,
+                    previousStatus: rfq.status,
+                    newStatus: 'Quotation in Progress'
+                }
+            );
+    
+            toast({
+                title: isCurrentlyLocked ? "RFQ Unlocked" : "RFQ Locked",
+                description: `RFQ ${rfq.rfqCode || rfq.code} has been ${isCurrentlyLocked ? 'unlocked' : 'locked'}.`,
+            });
+    
+        } catch (error) {
+            console.error('Error toggling lock:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update RFQ status. Please try again.",
+            });
+        }
+    };    
+
     const handleQuoteSubmit = async (productId: string, price: number, deliveryDate: Date, existingQuote?: Quote) => {
         if (!rfq || !user) return;
         try {
@@ -202,10 +326,16 @@ export default function RFQDetailClient() {
                 updatedQuotes = [...rfq.quotes, newQuote];
             }
 
-            const updatedRfqData = {
+            const updatedRfqData: any = {
                 quotes: updatedQuotes,
                 status: 'Quotation in Progress' as RFQStatus,
             };
+    
+            // Auto-unlock when quote is submitted
+            if (rfq.status === 'Locked' && rfq.lockedBy === user.id) {
+                updatedRfqData.lockedBy = null;
+                updatedRfqData.lockedAt = null;
+            }
 
             const docRef = doc(db, "rfqs", rfq.id);
             await updateDoc(docRef, updatedRfqData);
@@ -225,7 +355,7 @@ export default function RFQDetailClient() {
                 title: isUpdate ? "Quote Updated" : "Quote Submitted",
                 description: `Your quote for product ${rfq.products.find(p => p.id === productId)?.sku} has been saved.`,
             });
-        } catch (error) {
+            } catch (error) {
             console.error("Error submitting quote: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the quote.' });
         }
@@ -405,91 +535,131 @@ const handleSaveRfq = async () => {
         );
     }
 
-    if (!rfq) {
-        return null;
-    }
+    const ActionHistorySection = () => {
+        if (!rfq?.actionHistory || rfq.actionHistory.length === 0) {
+            return (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <History className="h-5 w-5" />
+                            {t('action_history_title')}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">No action history available.</p>
+                    </CardContent>
+                </Card>
+            );
+        }
+    
+        const sortedHistory = [...rfq.actionHistory].sort((a, b) => 
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+    
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <History className="h-5 w-5" />
+                        {t('action_history_title')}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {sortedHistory.map((action) => (
+                            <div key={action.id} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                                <div className="flex-shrink-0 mt-1">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium text-sm">
+                                            {t(`action_${action.actionType}`)}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {formatFirestoreDate(action.timestamp)}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        By {action.performedByName}
+                                    </p>
+                                    {action.details?.previousStatus && action.details?.newStatus && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Status changed from "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
+                                            to "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
 
     const isUserAssigned = rfq.assignedPurchaserIds?.includes(user?.id || '') || false;
     
     return (
         <div className="flex flex-col gap-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={() => router.back()}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                            {t('rfq_detail_title')} {rfq.rfqCode || rfq.code || `RFQ-${rfq.id.slice(0,6)}`}
-                            <Badge variant={getStatusVariant(rfq.status)}>{t(`status_${rfq.status.toLowerCase().replace(/ /g, '_')}`)}</Badge>
-                        </h1>
+            <div className="flex items-center gap-4">
+                <Button variant="outline" size="icon" onClick={() => router.back()}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex-1">
+                    <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                        RFQ Detail {rfq.rfqCode || rfq.code || `RFQ-${rfq.id.slice(0,6)}`}
+                        <Badge variant={getStatusVariant(rfq.status)}>{t(`status_${rfq.status.toLowerCase().replace(/ /g, '_')}`)}</Badge>
+                    </h1>
+                    <div className="flex items-center gap-4 mt-2">
                         <p className="text-muted-foreground">
                             {t('field_label_inquiry_time')}: {
                                 rfq.inquiryTime?.seconds 
-                                    ? new Date(rfq.inquiryTime.seconds * 1000).toLocaleString()
+                                    ? formatFirestoreDate(new Date(rfq.inquiryTime.seconds * 1000))
                                     : rfq.inquiryTime 
-                                        ? new Date(rfq.inquiryTime).toLocaleString()
+                                        ? formatFirestoreDate(rfq.inquiryTime)
                                         : 'N/A'
                             }
                         </p>
+                        {rfq.status === 'Locked' && rfq.lockedBy && (
+                            <p className="text-sm text-muted-foreground">
+                                {t('locked_by', { userName: users.find(u => u.id === rfq.lockedBy)?.name || 'Unknown' })}
+                            </p>
+                        )}
                     </div>
                 </div>
                 
-                {/* Edit button - only show for creator when status is "Waiting for Quote" */}
-                {user?.role === 'Sales' && 
-                 rfq.creatorId === user?.id && 
-                 rfq.status === 'Waiting for Quote' && (
-                    <div className="flex gap-2">
-                        {!isEditing ? (
-                            <Button onClick={() => {
-                                setIsEditing(true);
-                                // Initialize form with current RFQ data
-                                editForm.reset({
-                                    customerType: rfq.customerType,
-                                    customerEmail: rfq.customerEmail,
-                                    assignedPurchaserIds: rfq.assignedPurchaserIds,
-                                    products: rfq.products.map(p => ({
-                                        id: p.id,
-                                        wlid: p.wlid,
-                                        productSeries: p.productSeries,
-                                        sku: p.sku,
-                                        hairFiber: p.hairFiber,
-                                        cap: p.cap,
-                                        capSize: p.capSize,
-                                        length: p.length,
-                                        density: p.density,
-                                        color: p.color,
-                                        curlStyle: p.curlStyle,
-                                        images: p.images || []
-                                    }))
-                                });
-                                const imageState: {[productIndex: number]: {existing: string[], new: File[]}} = {};
-                                rfq.products.forEach((product, index) => {
-                                    imageState[index] = {
-                                        existing: product.images || [],
-                                        new: []
-                                    };
-                                });
-                                setEditingImages(imageState);  
-                            }}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit RFQ
-                            </Button>
+                {/* Lock/Unlock Toggle Button */}
+                {user?.role === 'Purchasing' && 
+                 rfq.assignedPurchaserIds.includes(user.id) && 
+                 (rfq.status === 'Waiting for Quote' || rfq.status === 'Locked') && (
+                    <Button
+                        variant={rfq.status === 'Locked' ? "destructive" : "outline"}
+                        onClick={handleLockToggle}
+                        className="flex items-center gap-2"
+                    >
+                        {rfq.status === 'Locked' ? (
+                            <>
+                                <Unlock className="h-4 w-4" />
+                                {t('button_unlock_rfq')}
+                            </>
                         ) : (
                             <>
-                                <Button variant="outline" onClick={() => setIsEditing(false)}>
-                                    Cancel
-                                </Button>
-                                <Button onClick={handleSaveRfq}>
-                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                    Save Changes
-                                </Button>
+                                <Lock className="h-4 w-4" />
+                                {t('button_lock_rfq')}
                             </>
                         )}
-                    </div>
+                    </Button>
                 )}
             </div>
+    
+            {/* Main Content Grid */}
+            <div className="grid md:grid-cols-3 gap-6">
+                <div className="md:col-span-2 space-y-6">
+                    {/* Your existing product cards code stays here */}
+                </div>
+</div>
 
             {/* Main Content Grid */}
             <div className="grid md:grid-cols-3 gap-6">
@@ -1023,6 +1193,7 @@ const handleSaveRfq = async () => {
                             )}
                         </CardContent>
                     </Card>
+                    <ActionHistorySection />
                 </div>
             </div>
             <ImageModal />

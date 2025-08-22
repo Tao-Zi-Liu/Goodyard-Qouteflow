@@ -20,7 +20,7 @@ export interface User {
   updatedAt?: string; // When the user was last updated
 }
 
-export type RFQStatus = 'Waiting for Quote' | 'Quotation in Progress' | 'Quotation Completed' | 'Archived';
+export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed' | 'Archived';
 
 export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee';
 
@@ -43,14 +43,43 @@ export interface Product {
 export type QuoteStatus = 'Pending Acceptance' | 'Accepted';
 
 export interface Quote {
+  id?: string;
   rfqId: string;
   productId: string;
   purchaserId: string;
   price: number;
-  deliveryDate: string; // ISO date string
-  quoteTime: string; // ISO date string
+  deliveryDate: string;
+  quoteTime: string;
   status: QuoteStatus;
+  notes?: string;
 }
+
+/* Action History Types */
+export type ActionType = 
+  | 'rfq_created' 
+  | 'rfq_locked' 
+  | 'rfq_unlocked' 
+  | 'quote_submitted' 
+  | 'quote_updated' 
+  | 'quote_accepted' 
+  | 'quote_rejected'
+  | 'status_changed';
+
+  export interface ActionHistory {
+    id: string;
+    rfqId: string;
+    actionType: ActionType;
+    performedBy: string; // User ID
+    performedByName: string; // User name for display
+    timestamp: string;
+    details?: {
+      previousStatus?: RFQStatus;
+      newStatus?: RFQStatus;
+      productId?: string;
+      quoteId?: string;
+      notes?: string;
+    };
+  }
 
 export interface RFQ {
   id: string;
@@ -64,6 +93,9 @@ export interface RFQ {
   products: Product[];
   quotes: Quote[];
   archiveReason?: string;
+  lockedBy?: string; // User ID who locked it
+  lockedAt?: string; // When it was locked
+  actionHistory?: ActionHistory[];
 }
 
 export interface AppNotification {
