@@ -1,14 +1,14 @@
 "use client";
+import { collection, getDocs, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Shield, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, Shield, PlusCircle, UserX, UserCheck, Key, Edit } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useI18n } from '@/hooks/use-i18n';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db, functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import type { User, UserRole } from '@/lib/types';
@@ -75,6 +75,42 @@ export default function UsersPage() {
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleUserStatusToggle = async (userId: string, currentStatus: string, userName: string) => {
+        try {
+            const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+            
+            // Update user status in Firestore
+            const userRef = doc(db, 'users', userId);
+            await updateDoc(userRef, {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser?.id
+            });
+    
+            // Update local state
+            setUsers(prevUsers => 
+                prevUsers.map(user => 
+                    user.id === userId 
+                        ? { ...user, status: newStatus as 'Active' | 'Inactive' }
+                        : user
+                )
+            );
+    
+            toast({
+                title: `User ${newStatus === 'Active' ? 'Activated' : 'Deactivated'}`,
+                description: `${userName} has been ${newStatus === 'Active' ? 'activated' : 'deactivated'} successfully.`
+            });
+    
+        } catch (error) {
+            console.error('Error updating user status:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update user status. Please try again."
+            });
         }
     };
 
@@ -306,7 +342,7 @@ export default function UsersPage() {
                                     <TableCell>
                                         <Badge 
                                             variant={user.status === 'Active' ? 'default' : 'destructive'} 
-                                            className={user.status === 'Active' ? 'bg-green-500' : ''}
+                                            className={user.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}
                                         >
                                             {user.status}
                                         </Badge>
@@ -318,21 +354,39 @@ export default function UsersPage() {
                                         }
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem>
-                                                    {t('button_reset_password')}
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem>
-                                                    Edit Details
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                    <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem
+                                            onClick={() => handleUserStatusToggle(user.id, user.status, user.name)}
+                                            className={user.status === 'Active' ? 'text-orange-600' : 'text-green-600'}
+                                        >
+                                            {user.status === 'Active' ? (
+                                                <>
+                                                    <UserX className="mr-2 h-4 w-4" />
+                                                    Deactivate User
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <UserCheck className="mr-2 h-4 w-4" />
+                                                    Activate User
+                                                </>
+                                            )}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem>
+                                            <Key className="mr-2 h-4 w-4" />
+                                            {t('button_reset_password')}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit Details
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                                     </TableCell>
                                 </TableRow>
                             ))}

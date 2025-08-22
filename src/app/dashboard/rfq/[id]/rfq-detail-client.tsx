@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import { ArrowLeft, Edit, CheckCircle, Send, XCircle, Eye, X, Upload } from 'lucide-react';
+import { ArrowLeft, Edit, CheckCircle, Clock, Send, XCircle, Eye, X, Upload, FileText, Lock, Unlock, History, Save } from 'lucide-react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -15,9 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { rfqFormSchema } from '@/lib/schemas';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '@/lib/firebase';
-import { Lock, Unlock, History, Clock } from 'lucide-react';
 import { serverTimestamp } from 'firebase/firestore';
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -105,6 +103,27 @@ export default function RFQDetailClient() {
                     })));
                     
                     setRfq(rfqData);
+                    if (rfqData && !editFormData) {
+                        editForm.reset({
+                            customerType: rfqData.customerType,
+                            customerEmail: rfqData.customerEmail,
+                            assignedPurchaserIds: rfqData.assignedPurchaserIds,
+                            products: rfqData.products.map(product => ({
+                                ...product,
+                                imageFiles: []
+                            }))
+                        });
+                        
+                        // Initialize editing images state
+                        const initialImages = {};
+                        rfqData.products.forEach((product, index) => {
+                            initialImages[index] = {
+                                existing: product.images || [],
+                                new: []
+                            };
+                        });
+                        setEditingImages(initialImages);
+                    }    
                     
                     const { getDocs, collection } = await import('firebase/firestore');
                     const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -180,6 +199,16 @@ export default function RFQDetailClient() {
 
             const updatedRfq = { ...rfq, ...updatedRfqData };
             setRfq(updatedRfq);
+            await addActionHistory(
+                rfq.id,
+                'quote_accepted',
+                {
+                    productId,
+                    quotePurchaserId: purchaserId,
+                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                    quotePrice: acceptedQuote.price
+                }
+            );
 
             createNotification({
                 recipientId: acceptedQuote.purchaserId,
@@ -193,6 +222,18 @@ export default function RFQDetailClient() {
                 title: "Quote Accepted",
                 description: "The quote has been accepted.",
             });
+            await addActionHistory(
+                rfq.id,
+                'quote_accepted',
+                {
+                    productId,
+                    quotePurchaserId: purchaserId,
+                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                    quotePrice: acceptedQuote.price,
+                    previousStatus: rfq.status,
+                    newStatus: newStatus
+                }
+            );
         } catch (error) {
             console.error("Error accepting quote: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to accept the quote.' });
@@ -343,6 +384,17 @@ export default function RFQDetailClient() {
             const updatedRfq = { ...rfq, ...updatedRfqData };
             setRfq(updatedRfq);
 
+            await addActionHistory(
+                rfq.id,
+                isUpdate ? 'quote_updated' : 'quote_submitted',
+                {
+                    productId,
+                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                    quotePrice: price,
+                    deliveryDate: deliveryDate.toISOString()
+                }
+            );
+
             createNotification({
                 recipientId: rfq.creatorId,
                 titleKey: isUpdate ? 'notification_quote_updated_title' : 'notification_new_quote_title',
@@ -350,6 +402,18 @@ export default function RFQDetailClient() {
                 bodyParams: { purchaserName: user.name, rfqCode: rfq.rfqCode || rfq.code },
                 href: `/dashboard/rfq/${rfq.id}`,
             });
+            await addActionHistory(
+                rfq.id,
+                isUpdate ? 'quote_updated' : 'quote_submitted',
+                {
+                    productId,
+                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                    quotePrice: price,
+                    deliveryDate: deliveryDate.toISOString(),
+                    previousStatus: rfq.status,
+                    newStatus: 'Quotation in Progress'
+                }
+            );
 
             toast({
                 title: isUpdate ? "Quote Updated" : "Quote Submitted",
@@ -362,14 +426,27 @@ export default function RFQDetailClient() {
     };
 
 
-const handleSaveRfq = async () => {
-        if (!rfq || !user) return;
+    const handleSaveRfq = async () => {
+        console.log('🔧 handleSaveRfq called');
+        console.log('🔧 rfq exists:', !!rfq);
+        console.log('🔧 user exists:', !!user);
+        
+        if (!rfq || !user) {
+            console.log('❌ Missing rfq or user');
+            return;
+        }
     
         try {
+            console.log('🔧 Getting form values...');
             const formData = editForm.getValues();
+            console.log('🔧 Form data:', formData);
             
+            console.log('🔧 Triggering validation...');
             const isValid = await editForm.trigger();
+            console.log('🔧 Form is valid:', isValid);
+            
             if (!isValid) {
+                console.log('❌ Form validation failed');
                 toast({
                     variant: "destructive",
                     title: "Validation Error",
@@ -377,15 +454,18 @@ const handleSaveRfq = async () => {
                 });
                 return;
             }
+            console.log('🔧 Starting image processing...');
     
             // Process images for each product
             const updatedProducts = await Promise.all(
                 formData.products.map(async (product, productIndex) => {
+                    console.log(`🔧 Processing product ${productIndex}:`, product.id);
                     const imageState = editingImages[productIndex] || { existing: [], new: [] };
                     
                     // Upload new images
                     let newImageUrls: string[] = [];
                     if (imageState.new.length > 0) {
+                        console.log(`🔧 Uploading ${imageState.new.length} new images...`);
                         const uploadPromises = imageState.new.map(async (file, index) => {
                             try {
                                 const fileName = `rfqs/${rfq.id}/${product.id}/${Date.now()}_${index}_${file.name}`;
@@ -412,7 +492,8 @@ const handleSaveRfq = async () => {
                     };
                 })
             );
-    
+            
+            console.log('🔧 Preparing RFQ update data...');
             const updatedRfqData = {
                 customerType: formData.customerType,
                 customerEmail: formData.customerEmail,
@@ -421,21 +502,37 @@ const handleSaveRfq = async () => {
                 updatedAt: new Date().toISOString(),
                 updatedBy: user.id
             };
-    
+
+            console.log('🔧 Updating Firestore document...');
             const docRef = doc(db, "rfqs", rfq.id);
             await updateDoc(docRef, updatedRfqData);
-    
+            
+            console.log('🔧 Update successful, updating local state...');
             const updatedRfq = { ...rfq, ...updatedRfqData };
             setRfq(updatedRfq);
             setIsEditing(false);
             setEditingImages({}); // Clear editing images state
-    
+
+            console.log('🔧 Adding action history...');
+            await addActionHistory(
+                rfq.id,
+                'rfq_edited',
+                {
+                    customerEmail: formData.customerEmail,
+                    customerType: formData.customerType,
+                    productCount: formData.products.length,
+                    assignedPurchasers: formData.assignedPurchaserIds.length
+                }
+            );
+
+            console.log('🔧 Showing success toast...');
             toast({
                 title: "RFQ Updated",
                 description: "The RFQ has been successfully updated.",
             });
     
         } catch (error) {
+            console.error('❌ Error in handleSaveRfq:', error);
             console.error("Error updating RFQ:", error);
             toast({
                 variant: "destructive",
@@ -536,6 +633,51 @@ const handleSaveRfq = async () => {
     }
 
     const ActionHistorySection = () => {
+            // Helper function to get the right icon for each action type
+        const getActionIcon = (actionType: string) => {
+            switch (actionType) {
+                case 'rfq_created':
+                    return <FileText className="h-4 w-4 text-blue-500" />;
+                case 'rfq_locked':
+                    return <Lock className="h-4 w-4 text-red-500" />;
+                case 'rfq_unlocked':
+                    return <Unlock className="h-4 w-4 text-green-500" />;
+                case 'quote_submitted':
+                    return <Send className="h-4 w-4 text-blue-500" />;
+                case 'quote_updated':
+                    return <Edit className="h-4 w-4 text-orange-500" />;
+                case 'quote_accepted':
+                    return <CheckCircle className="h-4 w-4 text-green-500" />;
+                case 'quote_rejected':
+                    return <XCircle className="h-4 w-4 text-red-500" />;
+                default:
+                    return <Clock className="h-4 w-4 text-muted-foreground" />;
+            }
+        };
+
+            // Helper function to get a readable description for each action
+        const getActionDescription = (action: any) => {
+            const details = action.details || {};
+            
+            switch (action.actionType) {
+                case 'rfq_created':
+                    return `Created RFQ for customer: ${details.customerEmail || 'Unknown'}`;
+                case 'rfq_locked':
+                    return `Locked RFQ for quoting`;
+                case 'rfq_unlocked':
+                    return `Unlocked RFQ`;
+                case 'quote_submitted':
+                    return `Submitted quote for ${details.productName || 'product'} - $${details.quotePrice || 'N/A'}`;
+                case 'quote_updated':
+                    return `Updated quote for ${details.productName || 'product'} - $${details.quotePrice || 'N/A'}`;
+                case 'quote_accepted':
+                    return `Accepted quote for ${details.productName || 'product'} - $${details.quotePrice || 'N/A'}`;
+                case 'quote_rejected':
+                    return `Rejected quote for ${details.productName || 'product'}`;
+                default:
+                    return t(`action_${action.actionType}`) || action.actionType;
+            }
+    };
         if (!rfq?.actionHistory || rfq.actionHistory.length === 0) {
             return (
                 <Card>
@@ -650,6 +792,19 @@ const handleSaveRfq = async () => {
                                 {t('button_lock_rfq')}
                             </>
                         )}
+                    </Button>
+                )}
+                {/* Edit RFQ Button */}
+                {user?.role === 'Sales' && 
+                user.id === rfq.creatorId && 
+                rfq.status === 'Waiting for Quote' && (
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsEditing(!isEditing)}
+                        className="flex items-center gap-2"
+                    >
+                        <Edit className="h-4 w-4" />
+                        {isEditing ? 'Cancel Edit' : 'Edit RFQ'}
                     </Button>
                 )}
             </div>
@@ -1196,6 +1351,34 @@ const handleSaveRfq = async () => {
                     <ActionHistorySection />
                 </div>
             </div>
+            {isEditing && (
+            <div className="flex justify-end gap-2 mt-6 border-t pt-6">
+                <Button 
+                    variant="outline" 
+                    onClick={() => {
+                        setIsEditing(false);
+                        setEditingImages({});
+                        // Reset form to original values
+                        editForm.reset({
+                            customerType: rfq.customerType,
+                            customerEmail: rfq.customerEmail,
+                            assignedPurchaserIds: rfq.assignedPurchaserIds,
+                            products: rfq.products.map(product => ({
+                                ...product,
+                                imageFiles: []
+                            }))
+                        });
+                    }}
+                >
+                    Cancel
+                </Button>
+                <Button onClick={handleSaveRfq}>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                </Button>
+            </div>
+        )}
+
             <ImageModal />
         </div>
     );

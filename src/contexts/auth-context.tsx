@@ -35,6 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
+
+        if (userData.status === 'Inactive') {
+          console.log('User account is inactive, denying access');
+          return null;
+      }
         return {
           id: firebaseUser.uid,
           email: firebaseUser.email!,
@@ -165,6 +170,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('Firebase auth successful for:', userCredential.user.email);
       
       const userData = await getUserData(userCredential.user);
+
+      if (userData && userData.status === 'Inactive') {
+        console.log('Login blocked: User account is inactive');
+        // Sign out the user immediately
+        await signOut(auth);
+        return false;
+    }
       
       if (!userData) {
         // Create user document if it doesn't exist
