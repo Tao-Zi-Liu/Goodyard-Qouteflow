@@ -36,6 +36,7 @@ export interface Product {
   density: string;
   color: string;
   curlStyle: string;
+  quantity: number;
   images: File[];
   imagePreviews?: string[];
 }

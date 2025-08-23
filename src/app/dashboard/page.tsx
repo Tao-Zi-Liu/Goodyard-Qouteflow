@@ -23,6 +23,7 @@ export default function DashboardPage() {
     const router = useRouter();
     const { user } = useAuth();
     const { t } = useI18n();
+    const { toast } = useToast();
 
     const [rfqs, setRfqs] = useState<RFQ[]>([]);
     const [purchasingUsers, setPurchasingUsers] = useState<User[]>([]);

@@ -13,7 +13,8 @@ const productSchema = z.object({
   density: z.string().min(1, 'Density is required'),
   color: z.string().min(1, 'Color is required'),
   curlStyle: z.string().min(1, 'Curls are required'),
-  images: z.any(), // Keeping it simple for now
+  quantity: z.number().min(1, 'Quantity must be at least 1'), 
+  images: z.any(), 
   imageFiles: z.any().optional(),
 });
 export const rfqFormSchema = z.object({

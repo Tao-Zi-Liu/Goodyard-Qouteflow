@@ -236,6 +236,24 @@ function ProductRow({
                   <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+            <FormField control={control} name={`products.${index}.quantity`} render={({ field }) => (
+              <FormItem>
+              <FormLabel>Quantity</FormLabel>
+              <FormControl>
+                <Input 
+                  type="number" 
+                  min="1" 
+                  {...field} 
+                  value={field.value || 1}
+                  onChange={(e) =>{const value =parseInt(e.target.value) || 1;field.onChange(value);}}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+                            )} />
+            <div></div> {/* Empty div to maintain grid layout */}
+            </div>
             <div className="space-y-4">
               <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
                 <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -501,6 +519,7 @@ export default function NewRfqPage() {
       density: '',
       color: '',
       curlStyle: '',
+      quantity: 1,
       images: [],
     }],
   };
@@ -515,22 +534,15 @@ export default function NewRfqPage() {
     name: 'products',
   });
 
+
+
+  
   const onPreview = (data: RfqFormValues) => {
-    // Get the current form values directly
+    // Use the direct form values since they contain the correct data
     const currentFormData = form.getValues();
-    console.log('📋 Direct form values:', currentFormData);
-    console.log('📋 Form data from submit:', data);
-    
-    // Check if imageFiles exist in either source
-    console.log('📋 Products with images (direct):', currentFormData.products.map(p => ({ 
-        id: p.id, 
-        imageCount: p.imageFiles?.length || 0,
-        hasImageFiles: !!p.imageFiles 
-    })));
-    
-    setFormData(data);
+    setFormData(currentFormData);
     setIsPreviewOpen(true);
-};
+  };
 
 const handleSave = async () => {
   if (!formData || !user) return;
@@ -555,18 +567,6 @@ const handleSave = async () => {
       const docRef = await addDoc(collection(db, "rfqs"), newRfqData);
       const newRfqId = docRef.id;
 
-      // Get the current form values directly (this includes imageFiles)
-      const currentFormValues = form.getValues();
-      console.log('🔍 Getting files from form values:', currentFormValues.products.map(p => ({
-          id: p.id,
-          imageFilesCount: p.imageFiles?.length || 0
-      })));
-
-      // Debug: Log all product IDs and stored images
-        console.log('🔍 Product IDs in formData:', formData.products.map(p => p.id));
-        console.log('🔍 Stored productImages keys:', Object.keys(productImages));
-        console.log('🔍 Full productImages state:', productImages);
-
       // Upload images for each product using the direct form values
       const productsWithImages = await Promise.all(
         formData.products.map(async (product: any) => {
@@ -579,17 +579,29 @@ const handleSave = async () => {
             let imageUrls: string[] = [];
             
             if (imageFiles.length > 0) {
-                console.log('⬆️ Starting upload for', imageFiles.length, 'files');
-                imageUrls = await uploadImages(imageFiles, newRfqId, product.id);
-                console.log('✅ Upload result:', imageUrls);
-            }
-            
-            return {
-                ...product,
-                images: imageUrls
-            };
+              console.log('⬆️ Starting upload for', imageFiles.length, 'files');
+              imageUrls = await uploadImages(imageFiles, newRfqId, product.id);
+              console.log('✅ Upload result:', imageUrls);
+          }
+      const cleanProduct = {
+        id: product.id,
+        wlid: product.wlid,
+        productSeries: product.productSeries,
+        sku: product.sku,
+        hairFiber: product.hairFiber,
+        cap: product.cap,
+        capSize: product.capSize,
+        length: product.length,
+        density: product.density,
+        color: product.color,
+        curlStyle: product.curlStyle,
+        quantity: product.quantity || 1,
+        images: imageUrls // Only include the uploaded URLs, not File objects
+        // Explicitly exclude imageFiles and any other File objects
+      };            
+      return cleanProduct;
         })
-    );
+        ) ;
 
       // Update the RFQ document with products that have image URLs
       await updateDoc(doc(db, "rfqs", newRfqId), {
@@ -641,6 +653,7 @@ const handleSave = async () => {
         density: '',
         color: '',
         curlStyle: '',
+        quantity: 1,
         images: []
     });
   }
@@ -825,6 +838,8 @@ const handleSave = async () => {
                     <CardContent className="space-y-2 text-sm">
                          <div className="flex justify-between"><span className="text-muted-foreground">Product Series</span><span>{product.productSeries}</span></div>
                          <div className="flex justify-between"><span className="text-muted-foreground">WLID</span><span>{product.wlid}</span></div>
+                         <div className="flex justify-between"><span className="text-muted-foreground">SKU</span><span>{product.sku || 'N/A'}</span></div>
+                         <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{product.quantity}</span></div>                        
                          <Separator />
                          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                             <div><span className="font-medium text-muted-foreground">Hair Fiber:</span> {product.hairFiber}</div>

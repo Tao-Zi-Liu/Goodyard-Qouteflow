@@ -168,37 +168,6 @@ export default function RFQDetailClient() {
         }
     };
 
-    const addActionHistory = async (rfqId: string, actionType: string, details?: any) => {
-        if (!user) return;
-        
-        try {
-            const rfqRef = doc(db, "rfqs", rfqId);
-            
-            const newAction = {
-                id: `action-${Date.now()}`,
-                rfqId,
-                actionType,
-                performedBy: user.id,
-                performedByName: user.name,
-                timestamp: new Date().toISOString(),
-                details: details || {}
-            };
-    
-            const updatedHistory = [...(rfq?.actionHistory || []), newAction];
-    
-            await updateDoc(rfqRef, {
-                actionHistory: updatedHistory
-            });
-    
-            // Update local state
-            if (rfq) {
-                setRfq({ ...rfq, actionHistory: updatedHistory });
-            }
-        } catch (error) {
-            console.error('Error adding action history:', error);
-        }
-    };
-
     const handleAcceptQuote = async (productId: string, purchaserId: string) => {
         if (!rfq || !user || user.role !== 'Sales') return;
 
@@ -230,7 +199,6 @@ export default function RFQDetailClient() {
 
             const updatedRfq = { ...rfq, ...updatedRfqData };
             setRfq(updatedRfq);
-
             await addActionHistory(
                 rfq.id,
                 'quote_accepted',
@@ -238,9 +206,7 @@ export default function RFQDetailClient() {
                     productId,
                     quotePurchaserId: purchaserId,
                     productName: rfq.products.find(p => p.id === productId)?.sku || '',
-                    quotePrice: acceptedQuote.price,
-                    previousStatus: rfq.status,
-                    newStatus: newStatus
+                    quotePrice: acceptedQuote.price
                 }
             );
 
@@ -256,12 +222,44 @@ export default function RFQDetailClient() {
                 title: "Quote Accepted",
                 description: "The quote has been accepted.",
             });
-        } catch (error) {
+        } 
+        catch (error) {
             console.error("Error accepting quote: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to accept the quote.' });
         }
     };
 
+    const addActionHistory = async (rfqId: string, actionType: string, details?: any) => {
+        if (!user) return;
+        
+        try {
+            const rfqRef = doc(db, "rfqs", rfqId);
+            
+            const newAction = {
+                id: `action-${Date.now()}`,
+                rfqId,
+                actionType,
+                performedBy: user.id,
+                performedByName: user.name,
+                timestamp: new Date().toISOString(),
+                details: details || {}
+            };
+    
+            const updatedHistory = [...(rfq?.actionHistory || []), newAction];
+    
+            await updateDoc(rfqRef, {
+                actionHistory: updatedHistory
+            });
+    
+            // Update local state
+            if (rfq) {
+                setRfq({ ...rfq, actionHistory: updatedHistory });
+            }
+        } catch (error) {
+            console.error('Error adding action history:', error);
+        }
+    };
+    
     const handleLockToggle = async () => {
         if (!rfq || !user || user.role !== 'Purchasing') return;
         if (!rfq.assignedPurchaserIds.includes(user.id)) return;
@@ -371,9 +369,7 @@ export default function RFQDetailClient() {
                     productId,
                     productName: rfq.products.find(p => p.id === productId)?.sku || '',
                     quotePrice: price,
-                    deliveryDate: deliveryDate.toISOString(),
-                    previousStatus: rfq.status,
-                    newStatus: 'Quotation in Progress'
+                    deliveryDate: deliveryDate.toISOString()
                 }
             );
 
@@ -384,17 +380,30 @@ export default function RFQDetailClient() {
                 bodyParams: { purchaserName: user.name, rfqCode: rfq.rfqCode || rfq.code },
                 href: `/dashboard/rfq/${rfq.id}`,
             });
+            await addActionHistory(
+                rfq.id,
+                isUpdate ? 'quote_updated' : 'quote_submitted',
+                {
+                    productId,
+                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                    quotePrice: price,
+                    deliveryDate: deliveryDate.toISOString(),
+                    previousStatus: rfq.status,
+                    newStatus: 'Quotation in Progress'
+                }
+            );
 
             toast({
                 title: isUpdate ? "Quote Updated" : "Quote Submitted",
                 description: `Your quote for product ${rfq.products.find(p => p.id === productId)?.sku} has been saved.`,
             });
-        } catch (error) {
+            } catch (error) {
             console.error("Error submitting quote: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the quote.' });
         }
     };
-    
+
+
     const handleSaveRfq = async () => {
         console.log('🔧 handleSaveRfq called');
         console.log('🔧 rfq exists:', !!rfq);
@@ -568,73 +577,86 @@ export default function RFQDetailClient() {
         if (!selectedImage) return null;
         
         return (
-            <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>Product Image</DialogTitle>
-                    </DialogHeader>
-                    <div className="relative">
-                        <img 
-                            src={selectedImage} 
-                            alt="Product image"
-                            className="w-full h-full object-contain"
-                        />
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 bg-white/80 hover:bg-white"
-                            onClick={() => setIsImageModalOpen(false)}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+          <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+            <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+            <DialogHeader className="sr-only">
+            <DialogTitle>Product Image</DialogTitle>
+          </DialogHeader>
+              <div className="relative">
+                <img 
+                  src={selectedImage} 
+                  alt="Product image"
+                  className="w-full h-full object-contain"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 bg-white/80 hover:bg-white"
+                  onClick={() => setIsImageModalOpen(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         );
-    };
+      };
+    
+    if (loading) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            </div>
+        );
+    }
 
     const ActionHistorySection = () => {
-            const getActionIcon = (actionType: string) => {
-                switch (actionType) {
-                    case 'rfq_created':
-                        return <FileText className="h-4 w-4 text-blue-500" />;
-                    case 'rfq_locked':
-                        return <Lock className="h-4 w-4 text-red-500" />;
-                    case 'rfq_unlocked':
-                        return <Unlock className="h-4 w-4 text-green-500" />;
-                    case 'quote_submitted':
-                        return <Send className="h-4 w-4 text-blue-500" />;
-                    case 'quote_updated':
-                        return <Edit className="h-4 w-4 text-orange-500" />;
-                    case 'quote_accepted':
-                        return <CheckCircle className="h-4 w-4 text-green-500" />;
-                    case 'quote_rejected':
-                        return <XCircle className="h-4 w-4 text-red-500" />;
-                    default:
-                        return <Clock className="h-4 w-4 text-muted-foreground" />;
-                }
-            };
-
-            if (!rfq?.actionHistory || rfq.actionHistory.length === 0) {
-                return (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <History className="h-5 w-5" />
-                                {t('action_history_title')}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">No action history available.</p>
-                        </CardContent>
-                    </Card>
-                );
+            // Helper function to get the right icon for each action type
+        const getActionIcon = (actionType: string) => {
+            switch (actionType) {
+                case 'rfq_created':
+                    return <FileText className="h-4 w-4 text-blue-500" />;
+                case 'rfq_locked':
+                    return <Lock className="h-4 w-4 text-red-500" />;
+                case 'rfq_unlocked':
+                    return <Unlock className="h-4 w-4 text-green-500" />;
+                case 'quote_submitted':
+                    return <Send className="h-4 w-4 text-blue-500" />;
+                case 'quote_updated':
+                    return <Edit className="h-4 w-4 text-orange-500" />;
+                case 'quote_accepted':
+                    return <CheckCircle className="h-4 w-4 text-green-500" />;
+                case 'quote_rejected':
+                    return <XCircle className="h-4 w-4 text-red-500" />;
+                default:
+                    return <Clock className="h-4 w-4 text-muted-foreground" />;
             }
-        
-            const sortedHistory = [...rfq.actionHistory].sort((a, b) => 
-                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-            );
-        
+        };
+
+            // Helper function to get a readable description for each action
+        const getActionDescription = (action: any) => {
+            const details = action.details || {};
+            
+            switch (action.actionType) {
+                case 'rfq_created':
+                    return `Created RFQ for customer: ${details.customerEmail || 'Unknown'}`;
+                case 'rfq_locked':
+                    return `Locked RFQ for quoting`;
+                case 'rfq_unlocked':
+                    return `Unlocked RFQ`;
+                case 'quote_submitted':
+                    return `Submitted quote for ${details.productName || 'product'} - $${details.quotePrice || 'N/A'}`;
+                case 'quote_updated':
+                    return `Updated quote for ${details.productName || 'product'} - $${details.quotePrice || 'N/A'}`;
+                case 'quote_accepted':
+                    return `Accepted quote for ${details.productName || 'product'} - $${details.quotePrice || 'N/A'}`;
+                case 'quote_rejected':
+                    return `Rejected quote for ${details.productName || 'product'}`;
+                default:
+                    return t(`action_${action.actionType}`) || action.actionType;
+            }
+    };
+        if (!rfq?.actionHistory || rfq.actionHistory.length === 0) {
             return (
                 <Card>
                     <CardHeader>
@@ -644,67 +666,64 @@ export default function RFQDetailClient() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-4">
-                            {sortedHistory.map((action) => (
-                                <div key={action.id} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                                    <div className="flex-shrink-0 mt-1">
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium text-sm">
-                                                {t(`action_${action.actionType}`)}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {formatFirestoreDate(action.timestamp)}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                            By {action.performedByName}
-                                        </p>
-                                        {action.details?.previousStatus && action.details?.newStatus && (
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                Status changed from "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
-                                                to "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                        <p className="text-sm text-muted-foreground">No action history available.</p>
                     </CardContent>
                 </Card>
             );
-        };
-    
-        const isUserAssigned = rfq?.assignedPurchaserIds?.includes(user?.id || '') || false;
-    
-        if (loading) {
-            return (
-                <div className="flex h-screen w-full items-center justify-center bg-background">
-                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-            );
         }
     
-        if (!rfq) {
-            return (
-                <div className="flex h-screen w-full items-center justify-center bg-background">
-                    <div className="text-center">
-                        <h2 className="text-2xl font-bold">RFQ not found</h2>
-                        <Button onClick={() => router.back()} className="mt-4">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Go Back
-                        </Button>
-                    </div>
-                </div>
-            );
-        }
-        
+        const sortedHistory = [...rfq.actionHistory].sort((a, b) => 
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+    
         return (
-            <div className="flex flex-col gap-6">
-    {/* Header */}
-    <div className="flex items-center gap-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <History className="h-5 w-5" />
+                        {t('action_history_title')}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {sortedHistory.map((action) => (
+                            <div key={action.id} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
+                                <div className="flex-shrink-0 mt-1">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium text-sm">
+                                            {t(`action_${action.actionType}`)}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {formatFirestoreDate(action.timestamp)}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        By {action.performedByName}
+                                    </p>
+                                    {action.details?.previousStatus && action.details?.newStatus && (
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Status changed from "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
+                                            to "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    const isUserAssigned = rfq.assignedPurchaserIds?.includes(user?.id || '') || false;
+    
+    return (
+        <div className="flex flex-col gap-6">
+            {/* Header */}
+            <div className="flex items-center gap-4">
                 <Button variant="outline" size="icon" onClick={() => router.back()}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
@@ -753,7 +772,6 @@ export default function RFQDetailClient() {
                         )}
                     </Button>
                 )}
-                
                 {/* Edit RFQ Button */}
                 {user?.role === 'Sales' && 
                 user.id === rfq.creatorId && 
@@ -768,8 +786,9 @@ export default function RFQDetailClient() {
                     </Button>
                 )}
             </div>
-    {/* Main Content Grid */}
-    <div className="grid md:grid-cols-3 gap-6">
+    
+            {/* Main Content Grid */}
+            <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
                     {isEditing && (
                         <Form {...editForm}>
@@ -819,26 +838,25 @@ export default function RFQDetailClient() {
                                                         </FormItem>
                                                     )}
                                                 />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
                                                 <FormField
                                                     control={editForm.control}
                                                     name={`products.${productIndex}.quantity`}
                                                     render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Quantity</FormLabel>
-                                                            <FormControl>
-                                                                <Input 
-                                                                    type="number" 
-                                                                    min="1" 
-                                                                    {...field} 
-                                                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                                                />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
+                                                    <FormItem>
+                                                    <FormLabel>Quantity</FormLabel>
+                                                    <FormControl>
+                                                <Input 
+                                                    type="number" 
+                                                    min="1" 
+                                                    {...field} 
+                                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
                                                     )}
                                                 />
+                                            <div className="grid grid-cols-2 gap-4">
                                                 <FormField
                                                     control={editForm.control}
                                                     name={`products.${productIndex}.hairFiber`}
@@ -852,9 +870,6 @@ export default function RFQDetailClient() {
                                                         </FormItem>
                                                     )}
                                                 />
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
                                                 <FormField
                                                     control={editForm.control}
                                                     name={`products.${productIndex}.cap`}
@@ -868,6 +883,8 @@ export default function RFQDetailClient() {
                                                         </FormItem>
                                                     )}
                                                 />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
                                                 <FormField
                                                     control={editForm.control}
                                                     name={`products.${productIndex}.capSize`}
@@ -881,8 +898,6 @@ export default function RFQDetailClient() {
                                                         </FormItem>
                                                     )}
                                                 />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
                                                 <FormField
                                                     control={editForm.control}
                                                     name={`products.${productIndex}.length`}
@@ -896,6 +911,8 @@ export default function RFQDetailClient() {
                                                         </FormItem>
                                                     )}
                                                 />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
                                                 <FormField
                                                     control={editForm.control}
                                                     name={`products.${productIndex}.density`}
@@ -909,8 +926,6 @@ export default function RFQDetailClient() {
                                                         </FormItem>
                                                     )}
                                                 />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
                                                 <FormField
                                                     control={editForm.control}
                                                     name={`products.${productIndex}.color`}
@@ -924,21 +939,20 @@ export default function RFQDetailClient() {
                                                         </FormItem>
                                                     )}
                                                 />
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.curlStyle`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Curl Style</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
                                             </div>
-
+                                            <FormField
+                                                control={editForm.control}
+                                                name={`products.${productIndex}.curlStyle`}
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Curl Style</FormLabel>
+                                                        <FormControl>
+                                                            <Input {...field} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
                                             {/* Image Upload Section */}
                                             <div className="space-y-4">
                                                 <div>
@@ -1038,13 +1052,17 @@ export default function RFQDetailClient() {
                             ))}
                         </Form>
                     )}
-
-{!isEditing && rfq.products.map((product, productIndex) => {
+                    
+                    {!isEditing && rfq.products.map((product, productIndex) => {
                         const quotes = rfq.quotes || [];
                         const productQuotes = quotes.filter(q => q.productId === product.id);
                         const userQuote = productQuotes.find(q => q.purchaserId === user?.id);
                         const acceptedQuote = productQuotes.find(q => q.status === 'Accepted');
                         const canSalesAccept = user?.role === 'Sales' && !acceptedQuote && productQuotes.length > 0;
+                        const canPurchaserQuote = user?.role === 'Purchasing' && 
+                            rfq.assignedPurchaserIds?.includes(user?.id || '') && 
+                            !userQuote && 
+                            !acceptedQuote;
 
                         return (
                             <Card key={product.id}>
@@ -1066,12 +1084,12 @@ export default function RFQDetailClient() {
                                         <div>
                                             <span className="text-muted-foreground">SKU:</span>
                                             <p className="font-medium">{product.sku || 'N/A'}</p>
-                                        </div>
-                                        <div>
+                                            </div>
+                                            <div>
                                             <span className="text-muted-foreground">Quantity:</span>
                                             <p className="font-medium">{product.quantity || 1}</p>
                                         </div>
-                                        <div>
+                                            <div>
                                             <span className="text-muted-foreground">Hair Fiber:</span>
                                             <p className="font-medium">{product.hairFiber || 'N/A'}</p>
                                         </div>
@@ -1100,34 +1118,33 @@ export default function RFQDetailClient() {
                                             <p className="font-medium">{product.curlStyle || 'N/A'}</p>
                                         </div>
                                     </div>
-                                    
                                     {/* Product Images Display */}
                                     {product.images && product.images.length > 0 && (
                                        <div className="mt-4 mb-6">
                                         <span className="text-sm text-muted-foreground">Product Images:</span>
                                         <div className="grid grid-cols-4 gap-2 mt-2">
-                                            {product.images.map((imageUrl, index) => (
-                                                <div 
-                                                  key={index} 
-                                                  className="relative group cursor-pointer"
-                                                  onClick={() => {
-                                                    setSelectedImage(imageUrl);
-                                                    setIsImageModalOpen(true);
-                                                  }}
-                                                >
-                                                    <img 
-                                                        src={imageUrl} 
-                                                        alt={`Product ${index + 1}`}
-                                                        className="w-full h-24 object-cover rounded-lg border hover:opacity-75 transition-opacity"
-                                                    />
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <div className="bg-black/50 rounded-full p-2">
-                                                            <Eye className="h-4 w-4 text-white" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                        {product.images.map((imageUrl, index) => (
+                                        <div 
+                                          key={index} 
+                                          className="relative group cursor-pointer"
+                                          onClick={() => {
+                                            setSelectedImage(imageUrl);
+                                            setIsImageModalOpen(true);
+                                          }}
+                                        >
+                                        <img 
+                                            src={imageUrl} 
+                                            alt={`Product ${index + 1}`}
+                                            className="w-full h-24 object-cover rounded-lg border hover:opacity-75 transition-opacity"
+                                            />
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="bg-black/50 rounded-full p-2">
+                                                <Eye className="h-4 w-4 text-white" />
+                                            </div>
                                         </div>
+                                        </div>
+                                        ))}
+                                            </div>
                                         </div>
                                     )}
                                     
@@ -1327,32 +1344,32 @@ export default function RFQDetailClient() {
                 </div>
             </div>
             {isEditing && (
-                <div className="flex justify-end gap-2 mt-6 border-t pt-6">
-                    <Button 
-                        variant="outline" 
-                        onClick={() => {
-                            setIsEditing(false);
-                            setEditingImages({});
-                            // Reset form to original values
-                            editForm.reset({
-                                customerType: rfq.customerType,
-                                customerEmail: rfq.customerEmail,
-                                assignedPurchaserIds: rfq.assignedPurchaserIds,
-                                products: rfq.products.map(product => ({
-                                    ...product,
-                                    imageFiles: []
-                                }))
-                            });
-                        }}
-                    >
-                        Cancel
-                    </Button>
-                    <Button onClick={handleSaveRfq}>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
-                    </Button>
-                </div>
-            )}
+            <div className="flex justify-end gap-2 mt-6 border-t pt-6">
+                <Button 
+                    variant="outline" 
+                    onClick={() => {
+                        setIsEditing(false);
+                        setEditingImages({});
+                        // Reset form to original values
+                        editForm.reset({
+                            customerType: rfq.customerType,
+                            customerEmail: rfq.customerEmail,
+                            assignedPurchaserIds: rfq.assignedPurchaserIds,
+                            products: rfq.products.map(product => ({
+                                ...product,
+                                imageFiles: []
+                            }))
+                        });
+                    }}
+                >
+                    Cancel
+                </Button>
+                <Button onClick={handleSaveRfq}>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                </Button>
+            </div>
+        )}
 
             <ImageModal />
         </div>
