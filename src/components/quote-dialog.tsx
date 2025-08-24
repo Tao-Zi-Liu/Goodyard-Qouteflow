@@ -16,7 +16,7 @@ interface QuoteDialogProps {
   children: React.ReactNode;
   product: Product;
   userQuote?: Quote;
-  onQuoteSubmit: (productId: string, price: number, deliveryDate: Date, existingQuote?: Quote) => Promise<void>;
+  onQuoteSubmit: (productId: string, price: number, deliveryDate: Date, message: string, existingQuote?: Quote) => Promise<void>;
 }
 
 export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: QuoteDialogProps) {
@@ -25,6 +25,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(
     userQuote?.deliveryDate ? new Date(userQuote.deliveryDate) : undefined
   );
+  const [message, setMessage] = useState(userQuote?.notes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,7 +37,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
 
     setIsSubmitting(true);
     try {
-      await onQuoteSubmit(product.id, Number(price), deliveryDate, userQuote);
+      await onQuoteSubmit(product.id, Number(price), deliveryDate, message, userQuote);
       setOpen(false);
     } catch (error) {
       console.error('Error submitting quote:', error);
@@ -48,6 +49,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   const resetForm = () => {
     setPrice(userQuote?.price?.toString() || '');
     setDeliveryDate(userQuote?.deliveryDate ? new Date(userQuote.deliveryDate) : undefined);
+    setMessage(userQuote?.notes || '');
   };
 
   return (
@@ -114,7 +116,26 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
                 </Popover>
               </div>
             </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="message" className="text-right pt-2">
+              Message
+            </Label>
+            <div className="col-span-3 space-y-2">
+              <textarea
+                id="message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Add operational notes about this quote (optional)"
+                maxLength={300}
+              />
+              <div className="text-xs text-muted-foreground text-right">
+                {message.length}/300 characters
+              </div>
+            </div>
           </div>
+          </div>
+
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel

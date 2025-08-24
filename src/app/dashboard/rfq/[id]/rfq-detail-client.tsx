@@ -320,7 +320,7 @@ export default function RFQDetailClient() {
         }
     };    
 
-    const handleQuoteSubmit = async (productId: string, price: number, deliveryDate: Date, existingQuote?: Quote) => {
+    const handleQuoteSubmit = async (productId: string, price: number, deliveryDate: Date, message: string, existingQuote?: Quote) => {
         if (!rfq || !user) return;
         try {
             let updatedQuotes: Quote[];
@@ -329,7 +329,7 @@ export default function RFQDetailClient() {
             if (isUpdate) {
                 updatedQuotes = rfq.quotes.map(q =>
                     q.productId === productId && q.purchaserId === user.id
-                        ? { ...q, price, deliveryDate: deliveryDate.toISOString(), quoteTime: new Date().toISOString() }
+                    ? { ...q, price, deliveryDate: deliveryDate.toISOString(), quoteTime: new Date().toISOString(), notes: message }
                         : q
                 );
             } else {
@@ -342,7 +342,7 @@ export default function RFQDetailClient() {
                     deliveryDate: deliveryDate.toISOString(),
                     quoteTime: new Date().toISOString(),
                     status: 'Pending Acceptance',
-                    notes: ''
+                    notes: message // Add the message here
                 };
                 updatedQuotes = [...rfq.quotes, newQuote];
             }
@@ -1140,34 +1140,49 @@ export default function RFQDetailClient() {
                                         <h4 className="font-semibold mb-2">Quotes</h4>
                                         {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">No quotes submitted yet.</p>}
                                         <div className="space-y-4">
-                                            {productQuotes.map(quote => (
-                                                <div key={quote.id || quote.purchaserId} className={`flex items-center justify-between p-3 rounded-lg ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted/50'}`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <Avatar>
-                                                            <AvatarImage src={getPurchaser(quote.purchaserId)?.avatar} />
-                                                            <AvatarFallback>{getPurchaser(quote.purchaserId)?.name?.charAt(0)}</AvatarFallback>
-                                                        </Avatar>
-                                                        <div>
-                                                            <p className="font-semibold">{getPurchaser(quote.purchaserId)?.name}</p>
-                                                            <p className="text-sm text-muted-foreground">
-                                                                Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}
-                                                            </p>
-                                                        </div>
+                                        {productQuotes.map(quote => (
+                                            <div key={quote.id || quote.purchaserId} className={`p-3 rounded-lg space-y-3 ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted/50'}`}>
+                                                {/* Header row with purchaser info and price */}
+                                                <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar>
+                                                    <AvatarImage src={getPurchaser(quote.purchaserId)?.avatar} />
+                                                    <AvatarFallback>{getPurchaser(quote.purchaserId)?.name?.charAt(0)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <div>
+                                                    <p className="font-semibold">{getPurchaser(quote.purchaserId)?.name}</p>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}
+                                                    </p>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <p className="text-lg font-bold">${quote.price.toFixed(2)}</p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
-                                                        </p>
-                                                    </div>
-                                                    {canSalesAccept && (
-                                                        <Button size="sm" variant="outline" onClick={() => handleAcceptQuote(product.id, quote.purchaserId)}>
-                                                            <CheckCircle className="mr-2 h-4 w-4" /> Accept
-                                                        </Button>
-                                                    )}
-                                                    {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">Accepted</Badge>}
-                                                    {quote.status === 'Rejected' && <Badge variant="destructive">Rejected</Badge>}
                                                 </div>
+                                                <div className="text-right">
+                                                    <p className="text-lg font-bold">${quote.price.toFixed(2)}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                    Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
+                                                    </p>
+                                                </div>
+                                                </div>
+                                                
+                                                {/* Message section - NEW */}
+                                                {quote.notes && (
+                                                <div className="bg-background/50 p-2 rounded border-l-4 border-blue-500">
+                                                    <p className="text-sm font-medium text-blue-700 mb-1">Operational Notes:</p>
+                                                    <p className="text-sm text-muted-foreground">{quote.notes}</p>
+                                                </div>
+                                                )}
+                                                
+                                                {/* Action buttons row */}
+                                                <div className="flex items-center justify-end gap-2">
+                                                {canSalesAccept && (
+                                                    <Button size="sm" variant="outline" onClick={() => handleAcceptQuote(product.id, quote.purchaserId)}>
+                                                    <CheckCircle className="mr-2 h-4 w-4" /> Accept
+                                                    </Button>
+                                                )}
+                                                {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">Accepted</Badge>}
+                                                {quote.status === 'Rejected' && <Badge variant="destructive">Rejected</Badge>}
+                                                </div>
+                                            </div>
                                             ))}
                                         </div>
                                         {user?.role === 'Purchasing' && isUserAssigned && !acceptedQuote && (
