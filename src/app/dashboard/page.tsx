@@ -363,6 +363,7 @@ export default function DashboardPage() {
                             <TableHead>{t('field_label_code')}</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>{t('field_label_inquiry_time')}</TableHead>
+                            <TableHead>Last Updated</TableHead>
                             <TableHead>Creator</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -390,6 +391,9 @@ export default function DashboardPage() {
                                     </TableCell>
                                     <TableCell>
                                         {formatFirestoreDate(rfq.inquiryTime)}
+                                    </TableCell>
+                                    <TableCell>  {/* ADD THIS ENTIRE CELL */}
+                                        {rfq.lastUpdatedTime ? formatFirestoreDate(rfq.lastUpdatedTime) : formatFirestoreDate(rfq.inquiryTime)}
                                     </TableCell>
                                     <TableCell>{getCreatorName(rfq.creatorId)}</TableCell>
                                     <TableCell className="text-right">

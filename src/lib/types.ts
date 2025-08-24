@@ -1,4 +1,3 @@
-
 export type UserRole = 'Admin' | 'Sales' | 'Purchasing';
 export type Language = 'en' | 'de' | 'zh';
 
@@ -49,6 +48,7 @@ export interface Quote {
   productId: string;
   purchaserId: string;
   price: number;
+  priceUSD?: number;
   deliveryDate: string;
   quoteTime: string;
   status: QuoteStatus;
@@ -97,6 +97,8 @@ export interface RFQ {
   lockedBy?: string; // User ID who locked it
   lockedAt?: string; // When it was locked
   actionHistory?: ActionHistory[];
+  lastUpdatedTime?: string; // NEW FIELD: Track last update for quotes, locks, and edits
+  rfqCode?: string; // Optional RFQ code field
 }
 
 export interface AppNotification {

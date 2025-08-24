@@ -11,6 +11,7 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Product, Quote } from '@/lib/types';
+import { convertRMBToUSD, formatRMB, formatUSD } from '@/lib/currency';
 
 interface QuoteDialogProps {
   children: React.ReactNode;
@@ -38,6 +39,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
     setIsSubmitting(true);
     try {
       await onQuoteSubmit(product.id, Number(price), deliveryDate, message, userQuote);
+
       setOpen(false);
     } catch (error) {
       console.error('Error submitting quote:', error);
@@ -68,25 +70,33 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
             {userQuote ? 'Update Your Quote' : 'Submit Your Quote'}
           </DialogTitle>
           <DialogDescription>
-            Enter your price and delivery date for <strong>{product.sku}</strong> ({product.wlid}).
+          Enter your price in RMB and delivery date for <strong>{product.sku}</strong> ({product.wlid}).
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
+          <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">
-                Price ($)
+                Price (RMB)
               </Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="col-span-3"
-                placeholder="0.00"
-                required
-              />
+              <div className="col-span-3">
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="mb-2"
+                  placeholder="0.00"
+                  placeholder="Enter price in RMB"
+                  required
+                />
+                {price && !isNaN(Number(price)) && Number(price) > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    ≈ {formatUSD(convertRMBToUSD(Number(price)))} USD
+                  </div>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">Delivery Date</Label>
@@ -141,7 +151,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting || !price || !deliveryDate}>
-              {isSubmitting ? 'Submitting...' : (userQuote ? 'Update Quote' : 'Submit Quote')}
+              {isSubmitting ? 'Submitting...' : (userQuote ? 'Update Quote' : 'Submit Quote (RMB)')}
             </Button>
           </DialogFooter>
         </form>

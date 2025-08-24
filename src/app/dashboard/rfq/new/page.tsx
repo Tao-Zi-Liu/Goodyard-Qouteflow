@@ -561,7 +561,8 @@ const handleSave = async () => {
           inquiryTime: serverTimestamp(),
           creatorId: user.id,
           status: 'Waiting for Quote',
-          quotes: []
+          quotes: [],
+          lastUpdatedTime: serverTimestamp(),
       };
 
       const docRef = await addDoc(collection(db, "rfqs"), newRfqData);

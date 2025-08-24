@@ -28,6 +28,8 @@ import type { RFQ, Quote, RFQStatus, Product } from '@/lib/types';
 import { QuoteDialog } from '@/components/quote-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
+import { convertRMBToUSD } from '@/lib/currency';
+import { formatRMB, formatUSD } from '@/lib/currency';
 
 const formatFirestoreDate = (date: any): string => {
     if (!date) return 'N/A';
@@ -222,7 +224,8 @@ export default function RFQDetailClient() {
 
             const updatedRfqData = {
                 quotes: updatedQuotes,
-                status: newStatus
+                status: newStatus,
+                lastUpdatedTime: serverTimestamp(),
             };
 
             const docRef = doc(db, "rfqs", rfq.id);
@@ -329,7 +332,12 @@ export default function RFQDetailClient() {
             if (isUpdate) {
                 updatedQuotes = rfq.quotes.map(q =>
                     q.productId === productId && q.purchaserId === user.id
-                    ? { ...q, price, deliveryDate: deliveryDate.toISOString(), quoteTime: new Date().toISOString(), notes: message }
+                    ? { ...q, 
+                        price,
+                        priceUSD: convertRMBToUSD(price), 
+                        deliveryDate: deliveryDate.toISOString(), 
+                        quoteTime: new Date().toISOString(), 
+                        notes: message }
                         : q
                 );
             } else {
@@ -339,6 +347,7 @@ export default function RFQDetailClient() {
                     productId,
                     purchaserId: user.id,
                     price,
+                    priceUSD: convertRMBToUSD(price),
                     deliveryDate: deliveryDate.toISOString(),
                     quoteTime: new Date().toISOString(),
                     status: 'Pending Acceptance',
@@ -350,6 +359,7 @@ export default function RFQDetailClient() {
             const updatedRfqData: any = {
                 quotes: updatedQuotes,
                 status: 'Quotation in Progress' as RFQStatus,
+                lastUpdatedTime: serverTimestamp(),
             };
     
             // Auto-unlock when quote is submitted
@@ -469,7 +479,8 @@ export default function RFQDetailClient() {
                 assignedPurchaserIds: formData.assignedPurchaserIds,
                 products: updatedProducts,
                 updatedAt: new Date().toISOString(),
-                updatedBy: user.id
+                updatedBy: user.id,
+                lastUpdatedTime: serverTimestamp(),
             };
 
             console.log('🔧 Updating Firestore document...');
@@ -1157,9 +1168,12 @@ export default function RFQDetailClient() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-lg font-bold">${quote.price.toFixed(2)}</p>
+                                                    <p className="text-lg font-bold">{formatRMB(quote.price)}</p>
+                                                    {quote.priceUSD && (
+                                                        <p className="text-sm text-muted-foreground">≈ {formatUSD(quote.priceUSD)}</p>
+                                                    )}
                                                     <p className="text-xs text-muted-foreground">
-                                                    Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
+                                                        Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
                                                     </p>
                                                 </div>
                                                 </div>
