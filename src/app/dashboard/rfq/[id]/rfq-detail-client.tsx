@@ -1068,8 +1068,12 @@ export default function RFQDetailClient() {
                                             <p className="font-medium">{product.sku || 'N/A'}</p>
                                         </div>
                                         <div>
-                                            <span className="text-muted-foreground">Quantity:</span>
-                                            <p className="font-medium">{product.quantity || 1}</p>
+                                            <span className={`text-muted-foreground ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                                Quantity:
+                                            </span>
+                                            <p className={`font-medium ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                                {product.quantity || 1}
+                                            </p>
                                         </div>
                                         <div>
                                             <span className="text-muted-foreground">Hair Fiber:</span>

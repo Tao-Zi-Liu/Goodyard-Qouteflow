@@ -839,7 +839,14 @@ const handleSave = async () => {
                          <div className="flex justify-between"><span className="text-muted-foreground">Product Series</span><span>{product.productSeries}</span></div>
                          <div className="flex justify-between"><span className="text-muted-foreground">WLID</span><span>{product.wlid}</span></div>
                          <div className="flex justify-between"><span className="text-muted-foreground">SKU</span><span>{product.sku || 'N/A'}</span></div>
-                         <div className="flex justify-between"><span className="text-muted-foreground">Quantity</span><span>{product.quantity}</span></div>                        
+                         <div className="flex justify-between">
+                              <span className={`text-muted-foreground ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                  Quantity
+                              </span>
+                              <span className={`${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                  {product.quantity}
+                              </span>
+                          </div>                       
                          <Separator />
                          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                             <div><span className="font-medium text-muted-foreground">Hair Fiber:</span> {product.hairFiber}</div>
