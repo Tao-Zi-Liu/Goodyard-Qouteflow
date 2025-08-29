@@ -32,6 +32,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { Textarea } from '@/components/ui/textarea';
 import { getApp } from 'firebase/app';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { getProductFormConfig, getAvailableProductSeries, type FormField } from '@/lib/product-form-configs';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -255,27 +256,39 @@ function ProductRow({
             <div></div> {/* Empty div to maintain grid layout */}
             </div>
             <div className="space-y-4">
-              <FormField control={control} name={`products.${index}.hairFiber`} render={({ field }) => (
-                <FormItem><FormLabel>Hair Fiber</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={control} name={`products.${index}.cap`} render={({ field }) => (
-                 <FormItem><FormLabel>Cap</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.capSize`} render={({ field }) => (
-                 <FormItem><FormLabel>Cap Size</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.length`} render={({ field }) => (
-                 <FormItem><FormLabel>Length</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.density`} render={({ field }) => (
-                 <FormItem><FormLabel>Density</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.color`} render={({ field }) => (
-                 <FormItem><FormLabel>Color</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-               <FormField control={control} name={`products.${index}.curlStyle`} render={({ field }) => (
-                 <FormItem><FormLabel>Curls</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+              {productData?.productSeries && (() => {
+                const config = getProductFormConfig(productData.productSeries);
+                if (config) {
+                  return config.fields.map((fieldConfig: FormField) => (
+                    <FormField 
+                      key={fieldConfig.name}
+                      control={control} 
+                      name={`products.${index}.${fieldConfig.name}` as any} 
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{fieldConfig.label}</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              value={field.value || ''}
+                              placeholder={fieldConfig.placeholder}
+                              className="placeholder:text-muted-foreground/60"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} 
+                    />
+                  ));
+                } else {
+                  return (
+                    <div className="text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                      <p className="font-medium">Configuration Pending</p>
+                      <p className="text-sm">Form fields for "{productData.productSeries}" are currently being configured. Please select Wig or Topper for now.</p>
+                    </div>
+                  );
+                }
+              })()}
             </div>
             
 {/* Image Upload Section */}
