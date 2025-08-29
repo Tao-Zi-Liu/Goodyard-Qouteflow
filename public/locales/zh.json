@@ -92,5 +92,9 @@
     "accepted": "已接受",
     "rejected": "已拒绝",
     "edit_your_quote": "编辑您的报价",
-    "submit_your_quote": "提交您的报价"
+    "submit_your_quote": "提交您的报价",
+    "no_action_history": "没有操作历史记录。",
+    "by": "由",
+    "status_changed_from": "状态从",
+    "to": "更改为"
 }

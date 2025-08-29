@@ -92,5 +92,9 @@
     "accepted": "Accepted",
     "rejected": "Rejected",
     "edit_your_quote": "Edit Your Quote",
-    "submit_your_quote": "Submit Your Quote"
+    "submit_your_quote": "Submit Your Quote",
+    "no_action_history": "No action history available.",
+    "by": "By",
+    "status_changed_from": "Status changed from",
+    "to": "to"
 }

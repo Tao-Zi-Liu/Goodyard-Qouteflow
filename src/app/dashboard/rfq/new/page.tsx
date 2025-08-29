@@ -97,23 +97,25 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
     return results.filter((url): url is string => url !== null);
 };
 
-function ProductRow({ 
+  function ProductRow({ 
     index, 
     control, 
     remove, 
     setValue, 
     onSimilarQuotesFound,
     updateProductImages,
-    productId
-}: { 
+    productId,
+    t
+  }: { 
     index: number, 
     control: any, 
     remove: (index: number) => void, 
     setValue: any, 
     onSimilarQuotesFound: (quotes: Quote[]) => void 
     updateProductImages: (productId: string, files: File[]) => void,
-    productId: string
-}) {
+    productId: string,
+    t: (key: string) => string
+  }) {
     const productData = useWatch({
         control,
         name: `products.${index}`,
@@ -259,27 +261,29 @@ function ProductRow({
               {productData?.productSeries && (() => {
                 const config = getProductFormConfig(productData.productSeries);
                 if (config) {
-                  return config.fields.map((fieldConfig: FormField) => (
-                    <FormField 
-                      key={fieldConfig.name}
-                      control={control} 
-                      name={`products.${index}.${fieldConfig.name}` as any} 
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{fieldConfig.label}</FormLabel>
-                          <FormControl>
-                            <Input 
-                              {...field} 
-                              value={field.value || ''}
-                              placeholder={fieldConfig.placeholder}
-                              className="placeholder:text-muted-foreground/60"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} 
-                    />
-                  ));
+                  return config.fields.map((fieldConfig: FormField) => {
+                    return (
+                      <FormField 
+                        key={fieldConfig.name}
+                        control={control} 
+                        name={`products.${index}.${fieldConfig.name}` as any} 
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t(fieldConfig.label)}</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                value={field.value || ''}
+                                placeholder={fieldConfig.placeholder}
+                                className="placeholder:text-muted-foreground/60"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} 
+                      />
+                    );
+                  });
                 } else {
                   return (
                     <div className="text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -727,6 +731,7 @@ const handleSave = async () => {
                         onSimilarQuotesFound={handleSimilarQuotesFound}
                         updateProductImages={updateProductImages}
                         productId={form.watch(`products.${index}.id`) || field.id}
+                        t={t}
                         />
                     ))}
                     <Button type="button" variant="outline" onClick={addProduct}>

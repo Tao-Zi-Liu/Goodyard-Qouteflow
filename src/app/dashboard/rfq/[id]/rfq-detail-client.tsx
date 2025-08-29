@@ -636,7 +636,7 @@ export default function RFQDetailClient() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm text-muted-foreground">No action history available.</p>
+                        <p className="text-sm text-muted-foreground">{t('no_action_history')}</p>
                         </CardContent>
                     </Card>
                 );
@@ -671,12 +671,12 @@ export default function RFQDetailClient() {
                                             </span>
                                         </div>
                                         <p className="text-sm text-muted-foreground mt-1">
-                                            By {action.performedByName}
+                                        {t('by')} {action.performedByName}
                                         </p>
                                         {action.details?.previousStatus && action.details?.newStatus && (
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                Status changed from "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
-                                                to "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
+                                                {t('status_changed_from')} "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
+                                                {t('to')} "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
                                             </p>
                                         )}
                                     </div>
@@ -1069,57 +1069,58 @@ export default function RFQDetailClient() {
                                             <img src={product.imageUrl} alt={product.sku} className="max-h-60 object-contain rounded-md" />
                                         </div>
                                     )}
+
                                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
-                                        <div>
-                                            <span className="text-muted-foreground">Product Series:</span>
-                                            <p className="font-medium">{product.productSeries}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">SKU:</span>
-                                            <p className="font-medium">{product.sku || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className={`text-muted-foreground ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
-                                                Quantity:
-                                            </span>
-                                            <p className={`font-medium ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
-                                                {product.quantity || 1}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Hair Fiber:</span>
-                                            <p className="font-medium">{product.hairFiber || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Cap:</span>
-                                            <p className="font-medium">{product.cap || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Cap Size:</span>
-                                            <p className="font-medium">{product.capSize || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Length:</span>
-                                            <p className="font-medium">{product.length || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Density:</span>
-                                            <p className="font-medium">{product.density || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Color:</span>
-                                            <p className="font-medium">{product.color || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Curl Style:</span>
-                                            <p className="font-medium">{product.curlStyle || 'N/A'}</p>
-                                        </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_product_series')}:</span>
+                                        <p className="font-medium">{product.productSeries}</p>
                                     </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_sku')}:</span>
+                                        <p className="font-medium">{product.sku || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className={`text-muted-foreground ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                            {t('field_quantity')}:
+                                        </span>
+                                        <p className={`font-medium ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                            {product.quantity || 1}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_hair_fiber')}:</span>
+                                        <p className="font-medium">{product.hairFiber || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_cap')}:</span>
+                                        <p className="font-medium">{product.cap || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_cap_size')}:</span>
+                                        <p className="font-medium">{product.capSize || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_length')}:</span>
+                                        <p className="font-medium">{product.length || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_density')}:</span>
+                                        <p className="font-medium">{product.density || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_color')}:</span>
+                                        <p className="font-medium">{product.color || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_curl_style')}:</span>
+                                        <p className="font-medium">{product.curlStyle || 'N/A'}</p>
+                                    </div>
+                                </div>
                                     
                                     {/* Product Images Display */}
                                     {product.images && product.images.length > 0 && (
                                        <div className="mt-4 mb-6">
-                                        <span className="text-sm text-muted-foreground">Product Images:</span>
+                                        <span className="text-sm text-muted-foreground">{t('product_images')}:</span>
                                         <div className="grid grid-cols-4 gap-2 mt-2">
                                             {product.images.map((imageUrl, index) => (
                                                 <div 
@@ -1148,8 +1149,8 @@ export default function RFQDetailClient() {
                                     
                                     <Separator />
                                     <div className="mt-4">
-                                        <h4 className="font-semibold mb-2">Quotes</h4>
-                                        {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">No quotes submitted yet.</p>}
+                                    <h4 className="font-semibold mb-2">{t('quotes')}</h4>
+                                    {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">{t('no_quotes_yet')}</p>}
                                         <div className="space-y-4">
                                         {productQuotes.map(quote => (
                                             <div key={quote.id || quote.purchaserId} className={`p-3 rounded-lg space-y-3 ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted/50'}`}>
@@ -1163,7 +1164,7 @@ export default function RFQDetailClient() {
                                                     <div>
                                                     <p className="font-semibold">{getPurchaser(quote.purchaserId)?.name}</p>
                                                     <p className="text-sm text-muted-foreground">
-                                                        Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}
+                                                    {t('quoted_on')}: {new Date(quote.quoteTime).toLocaleDateString()}
                                                     </p>
                                                     </div>
                                                 </div>
@@ -1173,7 +1174,7 @@ export default function RFQDetailClient() {
                                                         <p className="text-sm text-muted-foreground">≈ {formatUSD(quote.priceUSD)}</p>
                                                     )}
                                                     <p className="text-xs text-muted-foreground">
-                                                        Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
+                                                    {t('delivery')}: {new Date(quote.deliveryDate).toLocaleDateString()}
                                                     </p>
                                                 </div>
                                                 </div>
@@ -1181,7 +1182,7 @@ export default function RFQDetailClient() {
                                                 {/* Message section - NEW */}
                                                 {quote.notes && (
                                                 <div className="bg-background/50 p-2 rounded border-l-4 border-blue-500">
-                                                    <p className="text-sm font-medium text-blue-700 mb-1">Operational Notes:</p>
+                                                    <p className="text-sm font-medium text-blue-700 mb-1">{t('operational_notes')}:</p>
                                                     <p className="text-sm text-muted-foreground">{quote.notes}</p>
                                                 </div>
                                                 )}
@@ -1190,11 +1191,11 @@ export default function RFQDetailClient() {
                                                 <div className="flex items-center justify-end gap-2">
                                                 {canSalesAccept && (
                                                     <Button size="sm" variant="outline" onClick={() => handleAcceptQuote(product.id, quote.purchaserId)}>
-                                                    <CheckCircle className="mr-2 h-4 w-4" /> Accept
+                                                    <CheckCircle className="mr-2 h-4 w-4" /> {t('accept')}
                                                     </Button>
                                                 )}
-                                                {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">Accepted</Badge>}
-                                                {quote.status === 'Rejected' && <Badge variant="destructive">Rejected</Badge>}
+                                                {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">{t('accepted')}</Badge>}
+                                                {quote.status === 'Rejected' && <Badge variant="destructive">{t('rejected')}</Badge>}
                                                 </div>
                                             </div>
                                             ))}
@@ -1206,7 +1207,7 @@ export default function RFQDetailClient() {
                                                 onQuoteSubmit={handleQuoteSubmit}
                                             >
                                                 <Button className="mt-4 w-full" variant={userQuote ? 'outline' : 'default'}>
-                                                    {userQuote ? <><Edit className="mr-2 h-4 w-4" /> Edit Your Quote</> : <><Send className="mr-2 h-4 w-4" /> Submit Your Quote</>}
+                                                {userQuote ? <><Edit className="mr-2 h-4 w-4" /> {t('edit_your_quote')}</> : <><Send className="mr-2 h-4 w-4" /> {t('submit_your_quote')}</>}
                                                 </Button>
                                             </QuoteDialog>
                                         )}
@@ -1219,18 +1220,19 @@ export default function RFQDetailClient() {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
+
                     <Card>
                         <CardHeader>
-                            <CardTitle>Customer & Creator</CardTitle>
+                            <CardTitle>{t('customer_and_creator')}</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {!isEditing ? (
                                 <>
                                     <div>
-                                        <h4 className="font-semibold text-sm">Customer</h4>
+                                        <h4 className="font-semibold text-sm">{t('customer')}</h4>
                                         <p className="text-sm text-muted-foreground">{rfq.customerEmail}</p>
                                         <Badge variant="outline" className="mt-1">{rfq.customerType}</Badge>
-                                    </div>
+                </div>
                                     <Separator />
                                     {creator && (
                                         <div className="flex items-center gap-3">
@@ -1289,9 +1291,9 @@ export default function RFQDetailClient() {
                     </Card>
                     
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Assigned Purchasers</CardTitle>
-                        </CardHeader>
+                    <CardHeader>
+                        <CardTitle>{t('assigned_purchasers')}</CardTitle>
+                    </CardHeader>
                         <CardContent className="space-y-3">
                             {!isEditing ? (
                                 <>
