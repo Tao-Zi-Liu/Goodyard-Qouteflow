@@ -24,17 +24,18 @@ export const PRODUCT_FORM_CONFIGS: Record<string, ProductFormConfig> = {
     series: 'Wig',
     fields: [
         { name: 'sku', label: 'field_sku', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'hairFiber', label: 'field_hair_fiber', type: 'select', required: true, 
+        { name: 'hairFiber', label: 'field_hair_fiber', type: 'select', required: false, 
           options: ['Remy Human Hair', 'Virgin Human Hair', 'Synthetic Fiber', 'Heat Friendly Synthetic'] },
-        { name: 'wigCapConstruction', label: 'field_wig_cap_construction', type: 'select', required: true,
+        { name: 'cap', label: 'field_wig_cap_construction', type: 'select', required: false,
           options: ['Lace Front', 'Full Lace', 'Monofilament', 'Basic Cap', 'Hand Tied', '360 Lace'] },
-        { name: 'capSize', label: 'field_cap_size', type: 'select', required: true,
+        { name: 'capSize', label: 'field_cap_size', type: 'select', required: false,
           options: ['Petite', 'Average', 'Large', 'Custom'] },
-        { name: 'length', label: 'field_length', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'density', label: 'field_density', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'color', label: 'field_color', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'curlStyle', label: 'field_curl_style', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' }
+        { name: 'length', label: 'field_length', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'density', label: 'field_density', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'color', label: 'field_color', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'curlStyle', label: 'field_curl_style', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' }
       ],
+    /*
     schema: z.object({
       sku: z.string().min(1, 'SKU is required'),
       hairFiber: z.string().min(1, 'Hair Fiber is required'),
@@ -45,22 +46,24 @@ export const PRODUCT_FORM_CONFIGS: Record<string, ProductFormConfig> = {
       color: z.string().min(1, 'Color is required'),
       curlStyle: z.string().min(1, 'Curl Style is required'),
     })
+    */
   },
 
   'Topper': {
     series: 'Topper',
     fields: [
         { name: 'sku', label: 'field_sku', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'hairFiber', label: 'field_hair_fiber', type: 'select', required: true,
+        { name: 'hairFiber', label: 'field_hair_fiber', type: 'select', required: false,
           options: ['Human Hair', 'Heat Friendly Synthetic', 'Synthetic Fiber'] },
-        { name: 'cap', label: 'field_base_construction', type: 'select', required: true,
+        { name: 'cap', label: 'field_base_construction', type: 'select', required: false,
           options: ['Monofilament', 'Silk Top', 'Lace Top', 'Basic Base'] },
-        { name: 'baseSize', label: 'field_base_size', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'length', label: 'field_length', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'density', label: 'field_density', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'color', label: 'field_color', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' },
-        { name: 'curlStyle', label: 'field_style', type: 'text', required: true, placeholder: 'No such parameter, please fill in /' }
+        { name: 'capSize', label: 'field_base_size', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'length', label: 'field_length', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'density', label: 'field_density', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'color', label: 'field_color', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'curlStyle', label: 'field_style', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' }
       ],
+    /*
     schema: z.object({
       sku: z.string().min(1, 'SKU is required'),
       hairFiber: z.string().min(1, 'Hair Fiber is required'),
@@ -71,6 +74,7 @@ export const PRODUCT_FORM_CONFIGS: Record<string, ProductFormConfig> = {
       color: z.string().min(1, 'Color is required'),
       curlStyle: z.string().min(1, 'Curl Style is required'),
     })
+    */
   }
 };
 

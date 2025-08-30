@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
 import { convertRMBToUSD } from '@/lib/currency';
 import { formatRMB, formatUSD } from '@/lib/currency';
+import { AbandonQuoteDialog } from '@/components/abandon-quote-dialog';
 
 const formatFirestoreDate = (date: any): string => {
     if (!date) return 'N/A';
@@ -402,6 +403,81 @@ export default function RFQDetailClient() {
         } catch (error) {
             console.error("Error submitting quote: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the quote.' });
+        }
+    };
+
+    const handleAbandonQuote = async (productId: string, reason: string) => {
+        if (!rfq || !user) return;
+        
+        try {
+            const abandonedQuote: Quote = {
+                id: `quote-${Date.now()}`,
+                rfqId: rfq.id,
+                productId,
+                purchaserId: user.id,
+                quoteTime: new Date().toISOString(),
+                status: 'Abandoned',
+                abandonmentReason: reason,
+                abandonedAt: new Date().toISOString()
+            };
+    
+            const updatedQuotes = [...rfq.quotes.filter(q => !(q.productId === productId && q.purchaserId === user.id)), abandonedQuote];
+    
+            // Check if all assigned purchasers have abandoned all products
+            const allProductsAbandoned = rfq.products.every(product => {
+                return rfq.assignedPurchaserIds.every(purchaserId => {
+                    const purchaserQuote = updatedQuotes.find(q => 
+                        q.productId === product.id && q.purchaserId === purchaserId
+                    );
+                    return purchaserQuote?.status === 'Abandoned';
+                });
+            });
+    
+            const newStatus = allProductsAbandoned ? 'Abandoned' : rfq.status;
+    
+            const updatedRfqData = {
+                quotes: updatedQuotes,
+                status: newStatus,
+                lastUpdatedTime: serverTimestamp(),
+            };
+    
+            const docRef = doc(db, "rfqs", rfq.id);
+            await updateDoc(docRef, updatedRfqData);
+    
+            const updatedRfq = { ...rfq, ...updatedRfqData };
+            setRfq(updatedRfq);
+    
+            await addActionHistory(
+                rfq.id,
+                'quote_abandoned',
+                {
+                    productId,
+                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                    abandonmentReason: reason,
+                    previousStatus: rfq.status,
+                    newStatus: newStatus
+                }
+            );
+    
+            createNotification({
+                recipientId: rfq.creatorId,
+                titleKey: 'notification_quote_abandoned_title',
+                bodyKey: 'notification_quote_abandoned_body',
+                bodyParams: { purchaserName: user.name, rfqCode: rfq.rfqCode || rfq.code },
+                href: `/dashboard/rfq/${rfq.id}`,
+            });
+    
+            toast({
+                title: t('quote_abandoned'),
+                description: t('quote_abandoned_description'),
+            });
+        } catch (error) {
+            console.error("Error abandoning quote: ", error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error', 
+                description: 'Failed to abandon the quote.' 
+            });
         }
     };
     
@@ -1153,7 +1229,11 @@ export default function RFQDetailClient() {
                                     {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">{t('no_quotes_yet')}</p>}
                                         <div className="space-y-4">
                                         {productQuotes.map(quote => (
-                                            <div key={quote.id || quote.purchaserId} className={`p-3 rounded-lg space-y-3 ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted/50'}`}>
+                                            <div key={quote.id || quote.purchaserId} className={`p-3 rounded-lg space-y-3 ${
+                                                quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 
+                                                quote.status === 'Abandoned' ? 'bg-orange-100 dark:bg-orange-900/50' : 
+                                                'bg-muted/50'
+                                            }`}>
                                                 {/* Header row with purchaser info and price */}
                                                 <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
@@ -1169,13 +1249,19 @@ export default function RFQDetailClient() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-lg font-bold">{formatRMB(quote.price)}</p>
-                                                    {quote.priceUSD && (
-                                                        <p className="text-sm text-muted-foreground">≈ {formatUSD(quote.priceUSD)}</p>
+                                                    {quote.status === 'Abandoned' ? (
+                                                        <p className="text-lg font-bold text-orange-600">Quote Abandoned</p>
+                                                    ) : (
+                                                        <>
+                                                            <p className="text-lg font-bold">{quote.price ? formatRMB(quote.price) : 'N/A'}</p>
+                                                            {quote.priceUSD && (
+                                                                <p className="text-sm text-muted-foreground">≈ {formatUSD(quote.priceUSD)}</p>
+                                                            )}
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
+                                                            </p>
+                                                        </>
                                                     )}
-                                                    <p className="text-xs text-muted-foreground">
-                                                    {t('delivery')}: {new Date(quote.deliveryDate).toLocaleDateString()}
-                                                    </p>
                                                 </div>
                                                 </div>
                                                 
@@ -1185,6 +1271,17 @@ export default function RFQDetailClient() {
                                                     <p className="text-sm font-medium text-blue-700 mb-1">{t('operational_notes')}:</p>
                                                     <p className="text-sm text-muted-foreground">{quote.notes}</p>
                                                 </div>
+                                                )}
+
+                                                {/* Abandonment reason section - ADD THIS */}
+                                                {quote.status === 'Abandoned' && quote.abandonmentReason && (
+                                                    <div className="bg-orange-50 dark:bg-orange-900/20 p-2 rounded border-l-4 border-orange-500">
+                                                        <p className="text-sm font-medium text-orange-700 mb-1">{t('abandonment_reason_label')}:</p>
+                                                        <p className="text-sm text-muted-foreground">{quote.abandonmentReason}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {t('abandoned_on')}: {new Date(quote.abandonedAt || quote.quoteTime).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
                                                 )}
                                                 
                                                 {/* Action buttons row */}
@@ -1196,20 +1293,34 @@ export default function RFQDetailClient() {
                                                 )}
                                                 {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">{t('accepted')}</Badge>}
                                                 {quote.status === 'Rejected' && <Badge variant="destructive">{t('rejected')}</Badge>}
+                                                {quote.status === 'Abandoned' && <Badge variant="secondary" className="bg-orange-500 text-white">{t('status_abandoned')}</Badge>}
                                                 </div>
                                             </div>
                                             ))}
                                         </div>
-                                        {user?.role === 'Purchasing' && isUserAssigned && !acceptedQuote && (
-                                            <QuoteDialog 
-                                                product={product}
-                                                userQuote={userQuote}
-                                                onQuoteSubmit={handleQuoteSubmit}
-                                            >
-                                                <Button className="mt-4 w-full" variant={userQuote ? 'outline' : 'default'}>
-                                                {userQuote ? <><Edit className="mr-2 h-4 w-4" /> {t('edit_your_quote')}</> : <><Send className="mr-2 h-4 w-4" /> {t('submit_your_quote')}</>}
-                                                </Button>
-                                            </QuoteDialog>
+                                        {user?.role === 'Purchasing' && isUserAssigned && !acceptedQuote && !userQuote?.status?.includes('Abandoned') && (
+                                            <div className="mt-4 space-y-2">
+                                                <QuoteDialog 
+                                                    product={product}
+                                                    userQuote={userQuote}
+                                                    onQuoteSubmit={handleQuoteSubmit}
+                                                >
+                                                    <Button className="w-full" variant={userQuote ? 'outline' : 'default'}>
+                                                        {userQuote ? <><Edit className="mr-2 h-4 w-4" /> {t('edit_your_quote')}</> : <><Send className="mr-2 h-4 w-4" /> {t('submit_your_quote')}</>}
+                                                    </Button>
+                                                </QuoteDialog>
+                                                
+                                                <AbandonQuoteDialog
+                                                    productId={product.id}
+                                                    productName={product.sku || 'N/A'}
+                                                    onAbandonQuote={handleAbandonQuote}
+                                                >
+                                                    <Button className="w-full" variant="destructive">
+                                                        <XCircle className="mr-2 h-4 w-4" />
+                                                        {t('abandon_quote')}
+                                                    </Button>
+                                                </AbandonQuoteDialog>
+                                            </div>
                                         )}
                                     </div>
                                 </CardContent>
@@ -1277,7 +1388,7 @@ export default function RFQDetailClient() {
                                                         </FormControl>
                                                         <SelectContent>
                                                             <SelectItem value="New">New</SelectItem>
-                                                            <SelectItem value="Returning">Returning</SelectItem>
+                                                            <SelectItem value="Repeating">Repeating</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                     <FormMessage />

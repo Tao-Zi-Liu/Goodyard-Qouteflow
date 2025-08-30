@@ -259,41 +259,42 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
             </div>
             <div className="space-y-4">
               {productData?.productSeries && (() => {
-                const config = getProductFormConfig(productData.productSeries);
-                if (config) {
-                  return config.fields.map((fieldConfig: FormField) => {
-                    return (
-                      <FormField 
-                        key={fieldConfig.name}
-                        control={control} 
-                        name={`products.${index}.${fieldConfig.name}` as any} 
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t(fieldConfig.label)}</FormLabel>
-                            <FormControl>
-                              <Input 
-                                {...field} 
-                                value={field.value || ''}
-                                placeholder={fieldConfig.placeholder}
-                                className="placeholder:text-muted-foreground/60"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )} 
-                      />
-                    );
-                  });
-                } else {
-                  return (
-                    <div className="text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-4">
-                      <p className="font-medium">Configuration Pending</p>
-                      <p className="text-sm">Form fields for "{productData.productSeries}" are currently being configured. Please select Wig or Topper for now.</p>
-                    </div>
-                  );
-                }
-              })()}
-            </div>
+              const config = getProductFormConfig(productData.productSeries);
+              if (config) {
+                return config.fields.map((fieldConfig: FormField) => (
+                  <FormField 
+                    key={fieldConfig.name}
+                    control={control} 
+                    name={`products.${index}.${fieldConfig.name}` as any} 
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor={`product-${index}-${fieldConfig.name}`}>
+                          {t(fieldConfig.label)}
+                        </FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            id={`product-${index}-${fieldConfig.name}`}
+                            value={field.value || ''}
+                            placeholder={fieldConfig.placeholder}
+                            className="placeholder:text-muted-foreground/60"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} 
+                  />
+                ));
+              } else {
+                return (
+                  <div className="text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="font-medium">Configuration Pending</p>
+                    <p className="text-sm">Form fields for "{productData.productSeries}" are currently being configured. Please select Wig or Topper for now.</p>
+                  </div>
+                );
+              }
+            })()}
+          </div>
             
 {/* Image Upload Section */}
 <FormField
@@ -546,6 +547,13 @@ export default function NewRfqPage() {
     defaultValues,
   });
 
+  useEffect(() => {
+    const errors = form.formState.errors;
+    if (Object.keys(errors).length > 0) {
+        console.log('Form validation errors:', errors);
+    }
+  }, [form.formState.errors]);
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'products',
@@ -555,19 +563,28 @@ export default function NewRfqPage() {
 
   
   const onPreview = (data: RfqFormValues) => {
+    console.log('Form submitted successfully!');
+    console.log('Form validation passed');
+    console.log('Submitted data:', data);
     // Use the direct form values since they contain the correct data
     const currentFormData = form.getValues();
+    console.log('Current form data:', currentFormData);
+
     setFormData(currentFormData);
     setIsPreviewOpen(true);
   };
 
 const handleSave = async () => {
+  console.log('🔧 handleSave called');
+  console.log('🔧 formData exists:', !!formData);
+  console.log('🔧 user exists:', !!user);
+  console.log('🔧 formData:', formData);
   if (!formData || !user) return;
 
   setIsSaving(true);
   try {
+      console.log('🔧 Starting RFQ creation...');
       const newRfqCode = `RFQ-${String(rfqCount + 1).padStart(4, '0')}`;
-      
       // Create RFQ document first to get the ID
       const newRfqData = {
           rfqCode: newRfqCode,
@@ -644,6 +661,8 @@ const handleSave = async () => {
       setIsPreviewOpen(false);
       router.push('/dashboard');
   } catch (error) {
+      console.error('❌ Detailed error in handleSave:', error);
+      console.error('❌ Error stack:', error.stack);
       console.error("Error creating RFQ: ", error);
       toast({
           variant: "destructive",
@@ -753,7 +772,7 @@ const handleSave = async () => {
                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                            <SelectContent>
                              <SelectItem value="New">New</SelectItem>
-                             <SelectItem value="Returning">Returning</SelectItem>
+                             <SelectItem value="Repeating">Repeating</SelectItem>
                            </SelectContent>
                         </Select>
                         <FormMessage />
@@ -817,7 +836,15 @@ const handleSave = async () => {
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => router.push('/dashboard')}>Cancel</Button>
-              <Button type="submit">Create RFQ</Button>
+              <Button 
+                    type="submit" 
+                    onClick={() => {
+                        console.log('Submit button clicked');
+                        const errors = form.formState.errors;
+                        console.log('Current form errors:', errors);
+                        console.log('Form is valid:', form.formState.isValid);
+                    }}
+                >Create RFQ</Button>
             </div>
           </form>
         </Form>
