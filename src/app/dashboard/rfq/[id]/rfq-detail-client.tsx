@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
 import { convertRMBToUSD } from '@/lib/currency';
 import { formatRMB, formatUSD } from '@/lib/currency';
+import { AbandonQuoteDialog } from '@/components/abandon-quote-dialog';
 
 const formatFirestoreDate = (date: any): string => {
     if (!date) return 'N/A';
@@ -404,6 +405,81 @@ export default function RFQDetailClient() {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the quote.' });
         }
     };
+
+    const handleAbandonQuote = async (productId: string, reason: string) => {
+        if (!rfq || !user) return;
+        
+        try {
+            const abandonedQuote: Quote = {
+                id: `quote-${Date.now()}`,
+                rfqId: rfq.id,
+                productId,
+                purchaserId: user.id,
+                quoteTime: new Date().toISOString(),
+                status: 'Abandoned',
+                abandonmentReason: reason,
+                abandonedAt: new Date().toISOString()
+            };
+    
+            const updatedQuotes = [...rfq.quotes.filter(q => !(q.productId === productId && q.purchaserId === user.id)), abandonedQuote];
+    
+            // Check if all assigned purchasers have abandoned all products
+            const allProductsAbandoned = rfq.products.every(product => {
+                return rfq.assignedPurchaserIds.every(purchaserId => {
+                    const purchaserQuote = updatedQuotes.find(q => 
+                        q.productId === product.id && q.purchaserId === purchaserId
+                    );
+                    return purchaserQuote?.status === 'Abandoned';
+                });
+            });
+    
+            const newStatus = allProductsAbandoned ? 'Abandoned' : rfq.status;
+    
+            const updatedRfqData = {
+                quotes: updatedQuotes,
+                status: newStatus,
+                lastUpdatedTime: serverTimestamp(),
+            };
+    
+            const docRef = doc(db, "rfqs", rfq.id);
+            await updateDoc(docRef, updatedRfqData);
+    
+            const updatedRfq = { ...rfq, ...updatedRfqData };
+            setRfq(updatedRfq);
+    
+            await addActionHistory(
+                rfq.id,
+                'quote_abandoned',
+                {
+                    productId,
+                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                    abandonmentReason: reason,
+                    previousStatus: rfq.status,
+                    newStatus: newStatus
+                }
+            );
+    
+            createNotification({
+                recipientId: rfq.creatorId,
+                titleKey: 'notification_quote_abandoned_title',
+                bodyKey: 'notification_quote_abandoned_body',
+                bodyParams: { purchaserName: user.name, rfqCode: rfq.rfqCode || rfq.code },
+                href: `/dashboard/rfq/${rfq.id}`,
+            });
+    
+            toast({
+                title: t('quote_abandoned'),
+                description: t('quote_abandoned_description'),
+            });
+        } catch (error) {
+            console.error("Error abandoning quote: ", error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error', 
+                description: 'Failed to abandon the quote.' 
+            });
+        }
+    };
     
     const handleSaveRfq = async () => {
         console.log('🔧 handleSaveRfq called');
@@ -636,7 +712,7 @@ export default function RFQDetailClient() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-sm text-muted-foreground">No action history available.</p>
+                        <p className="text-sm text-muted-foreground">{t('no_action_history')}</p>
                         </CardContent>
                     </Card>
                 );
@@ -671,12 +747,12 @@ export default function RFQDetailClient() {
                                             </span>
                                         </div>
                                         <p className="text-sm text-muted-foreground mt-1">
-                                            By {action.performedByName}
+                                        {t('by')} {action.performedByName}
                                         </p>
                                         {action.details?.previousStatus && action.details?.newStatus && (
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                Status changed from "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
-                                                to "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
+                                                {t('status_changed_from')} "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
+                                                {t('to')} "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
                                             </p>
                                         )}
                                     </div>
@@ -1069,57 +1145,58 @@ export default function RFQDetailClient() {
                                             <img src={product.imageUrl} alt={product.sku} className="max-h-60 object-contain rounded-md" />
                                         </div>
                                     )}
+
                                     <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
-                                        <div>
-                                            <span className="text-muted-foreground">Product Series:</span>
-                                            <p className="font-medium">{product.productSeries}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">SKU:</span>
-                                            <p className="font-medium">{product.sku || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className={`text-muted-foreground ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
-                                                Quantity:
-                                            </span>
-                                            <p className={`font-medium ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
-                                                {product.quantity || 1}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Hair Fiber:</span>
-                                            <p className="font-medium">{product.hairFiber || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Cap:</span>
-                                            <p className="font-medium">{product.cap || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Cap Size:</span>
-                                            <p className="font-medium">{product.capSize || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Length:</span>
-                                            <p className="font-medium">{product.length || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Density:</span>
-                                            <p className="font-medium">{product.density || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Color:</span>
-                                            <p className="font-medium">{product.color || 'N/A'}</p>
-                                        </div>
-                                        <div>
-                                            <span className="text-muted-foreground">Curl Style:</span>
-                                            <p className="font-medium">{product.curlStyle || 'N/A'}</p>
-                                        </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_product_series')}:</span>
+                                        <p className="font-medium">{product.productSeries}</p>
                                     </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_sku')}:</span>
+                                        <p className="font-medium">{product.sku || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className={`text-muted-foreground ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                            {t('field_quantity')}:
+                                        </span>
+                                        <p className={`font-medium ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
+                                            {product.quantity || 1}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_hair_fiber')}:</span>
+                                        <p className="font-medium">{product.hairFiber || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_cap')}:</span>
+                                        <p className="font-medium">{product.cap || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_cap_size')}:</span>
+                                        <p className="font-medium">{product.capSize || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_length')}:</span>
+                                        <p className="font-medium">{product.length || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_density')}:</span>
+                                        <p className="font-medium">{product.density || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_color')}:</span>
+                                        <p className="font-medium">{product.color || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <span className="text-muted-foreground">{t('field_curl_style')}:</span>
+                                        <p className="font-medium">{product.curlStyle || 'N/A'}</p>
+                                    </div>
+                                </div>
                                     
                                     {/* Product Images Display */}
                                     {product.images && product.images.length > 0 && (
                                        <div className="mt-4 mb-6">
-                                        <span className="text-sm text-muted-foreground">Product Images:</span>
+                                        <span className="text-sm text-muted-foreground">{t('product_images')}:</span>
                                         <div className="grid grid-cols-4 gap-2 mt-2">
                                             {product.images.map((imageUrl, index) => (
                                                 <div 
@@ -1148,11 +1225,15 @@ export default function RFQDetailClient() {
                                     
                                     <Separator />
                                     <div className="mt-4">
-                                        <h4 className="font-semibold mb-2">Quotes</h4>
-                                        {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">No quotes submitted yet.</p>}
+                                    <h4 className="font-semibold mb-2">{t('quotes')}</h4>
+                                    {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">{t('no_quotes_yet')}</p>}
                                         <div className="space-y-4">
                                         {productQuotes.map(quote => (
-                                            <div key={quote.id || quote.purchaserId} className={`p-3 rounded-lg space-y-3 ${quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 'bg-muted/50'}`}>
+                                            <div key={quote.id || quote.purchaserId} className={`p-3 rounded-lg space-y-3 ${
+                                                quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 
+                                                quote.status === 'Abandoned' ? 'bg-orange-100 dark:bg-orange-900/50' : 
+                                                'bg-muted/50'
+                                            }`}>
                                                 {/* Header row with purchaser info and price */}
                                                 <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
@@ -1163,52 +1244,83 @@ export default function RFQDetailClient() {
                                                     <div>
                                                     <p className="font-semibold">{getPurchaser(quote.purchaserId)?.name}</p>
                                                     <p className="text-sm text-muted-foreground">
-                                                        Quoted on: {new Date(quote.quoteTime).toLocaleDateString()}
+                                                    {t('quoted_on')}: {new Date(quote.quoteTime).toLocaleDateString()}
                                                     </p>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-lg font-bold">{formatRMB(quote.price)}</p>
-                                                    {quote.priceUSD && (
-                                                        <p className="text-sm text-muted-foreground">≈ {formatUSD(quote.priceUSD)}</p>
+                                                    {quote.status === 'Abandoned' ? (
+                                                        <p className="text-lg font-bold text-orange-600">Quote Abandoned</p>
+                                                    ) : (
+                                                        <>
+                                                            <p className="text-lg font-bold">{quote.price ? formatRMB(quote.price) : 'N/A'}</p>
+                                                            {quote.priceUSD && (
+                                                                <p className="text-sm text-muted-foreground">≈ {formatUSD(quote.priceUSD)}</p>
+                                                            )}
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
+                                                            </p>
+                                                        </>
                                                     )}
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Delivery: {new Date(quote.deliveryDate).toLocaleDateString()}
-                                                    </p>
                                                 </div>
                                                 </div>
                                                 
                                                 {/* Message section - NEW */}
                                                 {quote.notes && (
                                                 <div className="bg-background/50 p-2 rounded border-l-4 border-blue-500">
-                                                    <p className="text-sm font-medium text-blue-700 mb-1">Operational Notes:</p>
+                                                    <p className="text-sm font-medium text-blue-700 mb-1">{t('operational_notes')}:</p>
                                                     <p className="text-sm text-muted-foreground">{quote.notes}</p>
                                                 </div>
+                                                )}
+
+                                                {/* Abandonment reason section - ADD THIS */}
+                                                {quote.status === 'Abandoned' && quote.abandonmentReason && (
+                                                    <div className="bg-orange-50 dark:bg-orange-900/20 p-2 rounded border-l-4 border-orange-500">
+                                                        <p className="text-sm font-medium text-orange-700 mb-1">{t('abandonment_reason_label')}:</p>
+                                                        <p className="text-sm text-muted-foreground">{quote.abandonmentReason}</p>
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            {t('abandoned_on')}: {new Date(quote.abandonedAt || quote.quoteTime).toLocaleDateString()}
+                                                        </p>
+                                                    </div>
                                                 )}
                                                 
                                                 {/* Action buttons row */}
                                                 <div className="flex items-center justify-end gap-2">
                                                 {canSalesAccept && (
                                                     <Button size="sm" variant="outline" onClick={() => handleAcceptQuote(product.id, quote.purchaserId)}>
-                                                    <CheckCircle className="mr-2 h-4 w-4" /> Accept
+                                                    <CheckCircle className="mr-2 h-4 w-4" /> {t('accept')}
                                                     </Button>
                                                 )}
-                                                {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">Accepted</Badge>}
-                                                {quote.status === 'Rejected' && <Badge variant="destructive">Rejected</Badge>}
+                                                {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">{t('accepted')}</Badge>}
+                                                {quote.status === 'Rejected' && <Badge variant="destructive">{t('rejected')}</Badge>}
+                                                {quote.status === 'Abandoned' && <Badge variant="secondary" className="bg-orange-500 text-white">{t('status_abandoned')}</Badge>}
                                                 </div>
                                             </div>
                                             ))}
                                         </div>
-                                        {user?.role === 'Purchasing' && isUserAssigned && !acceptedQuote && (
-                                            <QuoteDialog 
-                                                product={product}
-                                                userQuote={userQuote}
-                                                onQuoteSubmit={handleQuoteSubmit}
-                                            >
-                                                <Button className="mt-4 w-full" variant={userQuote ? 'outline' : 'default'}>
-                                                    {userQuote ? <><Edit className="mr-2 h-4 w-4" /> Edit Your Quote</> : <><Send className="mr-2 h-4 w-4" /> Submit Your Quote</>}
-                                                </Button>
-                                            </QuoteDialog>
+                                        {user?.role === 'Purchasing' && isUserAssigned && !acceptedQuote && !userQuote?.status?.includes('Abandoned') && (
+                                            <div className="mt-4 space-y-2">
+                                                <QuoteDialog 
+                                                    product={product}
+                                                    userQuote={userQuote}
+                                                    onQuoteSubmit={handleQuoteSubmit}
+                                                >
+                                                    <Button className="w-full" variant={userQuote ? 'outline' : 'default'}>
+                                                        {userQuote ? <><Edit className="mr-2 h-4 w-4" /> {t('edit_your_quote')}</> : <><Send className="mr-2 h-4 w-4" /> {t('submit_your_quote')}</>}
+                                                    </Button>
+                                                </QuoteDialog>
+                                                
+                                                <AbandonQuoteDialog
+                                                    productId={product.id}
+                                                    productName={product.sku || 'N/A'}
+                                                    onAbandonQuote={handleAbandonQuote}
+                                                >
+                                                    <Button className="w-full" variant="destructive">
+                                                        <XCircle className="mr-2 h-4 w-4" />
+                                                        {t('abandon_quote')}
+                                                    </Button>
+                                                </AbandonQuoteDialog>
+                                            </div>
                                         )}
                                     </div>
                                 </CardContent>
@@ -1219,18 +1331,19 @@ export default function RFQDetailClient() {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
+
                     <Card>
                         <CardHeader>
-                            <CardTitle>Customer & Creator</CardTitle>
+                            <CardTitle>{t('customer_and_creator')}</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {!isEditing ? (
                                 <>
                                     <div>
-                                        <h4 className="font-semibold text-sm">Customer</h4>
+                                        <h4 className="font-semibold text-sm">{t('customer')}</h4>
                                         <p className="text-sm text-muted-foreground">{rfq.customerEmail}</p>
                                         <Badge variant="outline" className="mt-1">{rfq.customerType}</Badge>
-                                    </div>
+                </div>
                                     <Separator />
                                     {creator && (
                                         <div className="flex items-center gap-3">
@@ -1275,7 +1388,7 @@ export default function RFQDetailClient() {
                                                         </FormControl>
                                                         <SelectContent>
                                                             <SelectItem value="New">New</SelectItem>
-                                                            <SelectItem value="Returning">Returning</SelectItem>
+                                                            <SelectItem value="Repeating">Repeating</SelectItem>
                                                         </SelectContent>
                                                     </Select>
                                                     <FormMessage />
@@ -1289,9 +1402,9 @@ export default function RFQDetailClient() {
                     </Card>
                     
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Assigned Purchasers</CardTitle>
-                        </CardHeader>
+                    <CardHeader>
+                        <CardTitle>{t('assigned_purchasers')}</CardTitle>
+                    </CardHeader>
                         <CardContent className="space-y-3">
                             {!isEditing ? (
                                 <>

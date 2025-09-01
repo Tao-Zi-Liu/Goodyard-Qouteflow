@@ -23,6 +23,8 @@ export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress'
 
 export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee';
 
+export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed' | 'Abandoned' | 'Archived';
+
 export interface Product {
   id: string;
   wlid: string;
@@ -51,8 +53,11 @@ export interface Quote {
   priceUSD?: number;
   deliveryDate: string;
   quoteTime: string;
-  status: QuoteStatus;
+  status: 'Pending Acceptance' | 'Accepted' | 'Rejected' | 'Abandoned';
   notes?: string;
+  abandonmentReason?: string;
+  abandonedAt?: string;
+
 }
 
 /* Action History Types */

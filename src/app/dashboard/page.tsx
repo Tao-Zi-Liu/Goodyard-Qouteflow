@@ -317,6 +317,34 @@ export default function DashboardPage() {
         rfq.status !== 'Quotation Completed'
     );
 
+    const formatRMB = (amount: number): string => {
+        return `¥${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      };
+      
+      const getTotalQuoteValue = (rfq: RFQ): number => {
+        if (!rfq.quotes || rfq.quotes.length === 0) return 0;
+        return rfq.quotes
+          .filter(quote => quote.status === 'Accepted' && quote.price)
+          .reduce((total, quote) => total + (quote.price || 0), 0);
+      };
+      
+      const getQuotesByPurchaser = (rfq: RFQ) => {
+        if (!rfq.quotes || rfq.quotes.length === 0) return [];
+        
+        const quotesByPurchaser = rfq.quotes.reduce((acc, quote) => {
+          if (quote.status === 'Accepted' && quote.price) {
+            const purchaserName = allUsers.find(u => u.id === quote.purchaserId)?.name || 'Unknown';
+            if (!acc[purchaserName]) {
+              acc[purchaserName] = 0;
+            }
+            acc[purchaserName] += quote.price;
+          }
+          return acc;
+        }, {} as Record<string, number>);
+        
+        return Object.entries(quotesByPurchaser);
+      };
+
     const RFQTable = ({ data }: { data: RFQ[] }) => {
         const paginatedData = getPaginatedData(data);
         const totalPages = getTotalPages(data.length);
@@ -358,16 +386,19 @@ export default function DashboardPage() {
     
                 {/* Table */}
                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>{t('field_label_code')}</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>{t('field_label_inquiry_time')}</TableHead>
-                            <TableHead>Last Updated</TableHead>
-                            <TableHead>Creator</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>{t('field_label_code')}</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>{t('field_customer_type')}</TableHead>
+                        <TableHead>{t('field_customer_email')}</TableHead>
+                        <TableHead>Quotes</TableHead>
+                        <TableHead>{t('field_label_inquiry_time')}</TableHead>
+                        <TableHead>Last Updated</TableHead>
+                        <TableHead>Creator</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
                     <TableBody>
                         {paginatedData.map((rfq) => {
                             const isAssignedPurchaser = user?.role === 'Purchasing' && rfq.assignedPurchaserIds.includes(user?.id || '');
@@ -389,10 +420,32 @@ export default function DashboardPage() {
                                             )}
                                         </div>
                                     </TableCell>
+                                    <TableCell>{rfq.customerType || 'N/A'}</TableCell>
+                                    <TableCell>{rfq.customerEmail || 'N/A'}</TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1">
+                                            {rfq.quotes && rfq.quotes.length > 0 ? (
+                                                <div className="grid gap-1">
+                                                    {rfq.quotes
+                                                        .filter(quote => quote.status === 'Accepted' && quote.price)
+                                                        .map((quote, index) => {
+                                                            const purchaserName = allUsers.find(u => u.id === quote.purchaserId)?.name || 'Unknown';
+                                                            return (
+                                                                <div key={index} className="text-xs">
+                                                                    ¥{quote.price} {t('by_purchaser')} {purchaserName}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                </div>
+                                            ) : (
+                                                <span className="text-muted-foreground text-xs">No quotes</span>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>
                                         {formatFirestoreDate(rfq.inquiryTime)}
                                     </TableCell>
-                                    <TableCell>  {/* ADD THIS ENTIRE CELL */}
+                                    <TableCell>
                                         {rfq.lastUpdatedTime ? formatFirestoreDate(rfq.lastUpdatedTime) : formatFirestoreDate(rfq.inquiryTime)}
                                     </TableCell>
                                     <TableCell>{getCreatorName(rfq.creatorId)}</TableCell>
