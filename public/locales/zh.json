@@ -62,7 +62,7 @@
     "notification_quote_updated_title": "报价已更新",
     "notification_quote_updated_body": "{purchaserName} 已更新了询价单 {rfqCode} 的报价。",
     "field_product_series":"产品系列",
-    "field_sku": "SKU",
+    "field_sku": "参考SKU",
     "field_quantity": "数量",
     "field_hair_fiber": "发质",
     "field_cap": "网底类型",
@@ -158,6 +158,10 @@
     "characters": "字符",
     "submitting": "提交中...",
     "update_quote": "更新报价",
-    "submit_quote_rmb": "提交报价 (人民币)"
+    "submit_quote_rmb": "提交报价 (人民币)",
+    "status_sent": "已发送",
+    "button_mark_as_sent": "标记为已发送",
+    "rfq_sent_title": "RFQ已发送",
+    "rfq_sent_description": "RFQ已成功标记为已发送给客户"
     
 }

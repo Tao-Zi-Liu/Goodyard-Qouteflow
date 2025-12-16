@@ -11,7 +11,7 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Product, Quote } from '@/lib/types';
-import { convertRMBToUSD, formatRMB, formatUSD } from '@/lib/currency';
+import { convertRMBToUSD, calculateCustomizedPrice, formatRMB, formatUSD } from '@/lib/currency';
 import { TranslateButton } from '@/components/translate-button';
 import { useI18n } from '@/hooks/use-i18n';
 
@@ -24,7 +24,9 @@ interface QuoteDialogProps {
 
 export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: QuoteDialogProps) {
   const [open, setOpen] = useState(false);
-  const [price, setPrice] = useState(userQuote?.price?.toString() || '');
+  const [price, setPrice] = useState(
+    userQuote?.salesCostPriceRMB?.toString() || userQuote?.price?.toString() || ''
+  );
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(
     userQuote?.deliveryDate ? new Date(userQuote.deliveryDate) : undefined
   );
@@ -32,7 +34,6 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t } = useI18n();
   
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -43,7 +44,6 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
     setIsSubmitting(true);
     try {
       await onQuoteSubmit(product.id, Number(price), deliveryDate, message, userQuote);
-
       setOpen(false);
     } catch (error) {
       console.error('Error submitting quote:', error);
@@ -53,10 +53,17 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   };
 
   const resetForm = () => {
-    setPrice(userQuote?.price?.toString() || '');
+    setPrice(
+      userQuote?.salesCostPriceRMB?.toString() || userQuote?.price?.toString() || ''
+    );
     setDeliveryDate(userQuote?.deliveryDate ? new Date(userQuote.deliveryDate) : undefined);
     setMessage(userQuote?.notes || '');
   };
+
+  // Calculate all prices for preview
+  const rmbPrice = price && !isNaN(Number(price)) ? Number(price) : 0;
+  const salesCostUSD = rmbPrice > 0 ? convertRMBToUSD(rmbPrice) : 0;
+  const customizedPriceUSD = rmbPrice > 0 ? calculateCustomizedPrice(rmbPrice) : 0;
 
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
@@ -68,20 +75,20 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-      <DialogHeader>
-        <DialogTitle>
-          {userQuote ? t('update_your_quote') : t('submit_your_quote')}
-        </DialogTitle>
-        <DialogDescription>
-          {t('enter_price_and_delivery_description')} <strong>{product.sku}</strong> ({product.wlid}).
-        </DialogDescription>
-      </DialogHeader>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>
+            {userQuote ? t('update_your_quote') : t('submit_your_quote')}
+          </DialogTitle>
+          <DialogDescription>
+            {t('enter_price_and_delivery_description')} <strong>{product.sku}</strong> ({product.wlid}).
+          </DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
+            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">
-              {t('price_rmb')}
+                {t('price_rmb')}
               </Label>
               <div className="col-span-3">
                 <Input
@@ -91,19 +98,33 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                   className="mb-2"
-                  placeholder="0.00"
                   placeholder={t('enter_price_rmb')}
                   required
                 />
-                {price && !isNaN(Number(price)) && Number(price) > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    ≈ {formatUSD(convertRMBToUSD(Number(price)))} USD
+                {rmbPrice > 0 && (
+                  <div className="text-xs space-y-1 p-2 bg-muted/50 rounded">
+                    <div className="font-medium text-muted-foreground">Price Preview:</div>
+                    <div className="grid grid-cols-1 gap-1">
+                      <div className="flex justify-between">
+                        <span>Sales Cost (RMB):</span>
+                        <span className="font-medium">{formatRMB(rmbPrice)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Sales Cost (USD):</span>
+                        <span className="font-medium">{formatUSD(salesCostUSD)}</span>
+                      </div>
+                      <div className="flex justify-between border-t pt-1">
+                        <span>Customer Price (USD):</span>
+                        <span className="font-medium text-green-600">{formatUSD(customizedPriceUSD)}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             </div>
+            
             <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right">{t('delivery_date')}</Label>
+              <Label className="text-right">{t('delivery_date')}</Label>
               <div className="col-span-3">
                 <Popover>
                   <PopoverTrigger asChild>
@@ -130,10 +151,11 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
                 </Popover>
               </div>
             </div>
+            
             <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="message" className="text-right pt-2">
-              {t('message')}
-            </Label>
+              <Label htmlFor="message" className="text-right pt-2">
+                {t('message')}
+              </Label>
               <div className="col-span-3 space-y-2">
                 <div className="flex gap-2">
                   <textarea
@@ -152,7 +174,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground text-right">
-                {message.length}/300 {t('characters')}
+                  {message.length}/300 {t('characters')}
                 </div>
               </div>
             </div>
@@ -160,7 +182,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-            {t('cancel')}
+              {t('cancel')}
             </Button>
             <Button type="submit" disabled={isSubmitting || !price || !deliveryDate}>
               {isSubmitting ? t('submitting') : (userQuote ? t('update_quote') : t('submit_quote_rmb'))}

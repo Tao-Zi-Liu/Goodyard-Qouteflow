@@ -17,7 +17,9 @@ import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Lock, Unlock,X } from 'lucide-react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { convertRMBToSalesUSD } from '@/lib/currency';
 import { useToast } from '@/hooks/use-toast';
+import { formatRMB } from '@/lib/currency';
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -471,27 +473,28 @@ export default function DashboardPage() {
                                     <TableCell>{rfq.customerType || 'N/A'}</TableCell>
                                     <TableCell>{rfq.customerEmail || 'N/A'}</TableCell>
                                     <TableCell>
-                                        <div className="space-y-1">
-                                            {rfq.quotes && rfq.quotes.length > 0 ? (
-                                            <div className="grid gap-1">
-                                                {rfq.quotes
-                                                .filter(quote => quote.status === 'Accepted' && quote.price)
-                                                .map((quote, index) => {
-                                                    const purchaserName = allUsers.find(u => u.id === quote.purchaserId)?.name || 'Unknown';
-                                                    const displayPrice = user?.role === 'Sales' 
-                                                    ? `$${(quote.price / 7.25).toFixed(2)}`
-                                                    : `¥${quote.price}`;
-                                                    return (
-                                                    <div key={index} className="text-xs">
-                                                        {displayPrice} {t('by_purchaser')} {purchaserName}
+                                            <div className="space-y-1">
+                                                {rfq.quotes && rfq.quotes.length > 0 ? (
+                                                    <div className="grid gap-1">
+                                                        {rfq.quotes
+                                                        .filter(quote => quote.status === 'Accepted' && (quote.customizedProductPriceUSD || quote.salesCostPriceRMB || quote.price))
+                                                        .map((quote, index) => {
+                                                            const purchaserName = allUsers.find(u => u.id === quote.purchaserId)?.name || 'Unknown';
+                                                            
+                                                            // Everyone sees Customized Product Price in the list
+                                                            const displayPrice = `$${(quote.customizedProductPriceUSD || 0).toFixed(2)}`;
+                                                            
+                                                            return (
+                                                                <div key={index} className="text-xs">
+                                                                    {displayPrice} {t('by_purchaser')} {purchaserName}
+                                                                </div>
+                                                            );
+                                                        })}
                                                     </div>
-                                                    );
-                                                })}
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">No quotes</span>
+                                                )}
                                             </div>
-                                            ) : (
-                                            <span className="text-muted-foreground text-xs">No quotes</span>
-                                            )}
-                                        </div>
                                         </TableCell>
                                     <TableCell>
                                         {formatFirestoreDate(rfq.inquiryTime)}

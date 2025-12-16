@@ -1,3 +1,4 @@
+
 export type UserRole = 'Admin' | 'Sales' | 'Purchasing';
 export type Language = 'en' | 'de' | 'zh';
 
@@ -19,7 +20,7 @@ export interface User {
   updatedAt?: string; // When the user was last updated
 }
 
-export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed' | 'Abandoned' | 'Closed' | 'Archived';
+export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed'| 'Sent'   | 'Abandoned' | 'Closed' | 'Archived';
 export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee';
 
 export interface Product {
@@ -46,8 +47,12 @@ export interface Quote {
   rfqId: string;
   productId: string;
   purchaserId: string;
-  price: number;
-  priceUSD?: number;
+  
+  // Price fields with clear naming
+  salesCostPriceRMB?: number;        // Original RMB price entered by Purchaser
+  salesCostPriceUSD?: number;        // RMB ÷ 7.25
+  customizedProductPriceUSD?: number; // (RMB ÷ 2.7 + 40) × 1.075
+  
   deliveryDate: string;
   quoteTime: string;
   status: 'Pending Acceptance' | 'Accepted' | 'Rejected' | 'Abandoned';
@@ -55,7 +60,11 @@ export interface Quote {
   abandonmentReason?: string;
   abandonedAt?: string;
 
+  // Deprecated fields - keep for backward compatibility, remove later
+  price?: number;  // Will be same as salesCostPriceRMB
+  priceUSD?: number; // Will be same as salesCostPriceUSD
 }
+
 
 /* Action History Types */
 export type ActionType = 
@@ -88,7 +97,7 @@ export interface RFQ {
   id: string;
   code: string;
   status: RFQStatus;
-  inquiryTime: string; // ISO date string
+  inquiryTime: any; // Can be string, Date, or Firestore Timestamp
   creatorId: string; // Sales user ID
   assignedPurchaserIds: string[];
   customerType: string;
@@ -99,7 +108,7 @@ export interface RFQ {
   lockedBy?: string; // User ID who locked it
   lockedAt?: string; // When it was locked
   actionHistory?: ActionHistory[];
-  lastUpdatedTime?: string; // NEW FIELD: Track last update for quotes, locks, and edits
+  lastUpdatedTime?: any; // NEW FIELD: Track last update for quotes, locks, and edits
   rfqCode?: string; // Optional RFQ code field
 }
 

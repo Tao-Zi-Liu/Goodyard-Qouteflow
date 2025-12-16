@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -23,16 +24,15 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAuth } from '@/hooks/use-auth';
-import { MOCK_USERS } from '@/lib/data';
-import type { RFQ, Quote, RFQStatus, Product } from '@/lib/types';
+import type { RFQ, Quote, RFQStatus, Product, User } from '@/lib/types';
 import { QuoteDialog } from '@/components/quote-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
-import { convertRMBToUSD } from '@/lib/currency';
-import { formatRMB, formatUSD } from '@/lib/currency';
+import { convertRMBToUSD, calculateCustomizedPrice, } from '@/lib/currency';
 import { AbandonQuoteDialog } from '@/components/abandon-quote-dialog';
 import { TranslateButton } from '@/components/translate-button';
 import { translateText } from '@/lib/translate';
+import { formatRMB, formatUSD } from '@/lib/currency';
 
 const formatFirestoreDate = (date: any): string => {
     if (!date) return 'N/A';
@@ -69,12 +69,12 @@ export default function RFQDetailClient() {
     const [rfq, setRfq] = useState<RFQ | null>(null);
     const [creator, setCreator] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editFormData, setEditFormData] = useState<any>(null);
-    const [purchasingUsers, setPurchasingUsers] = useState<any[]>([]);
+    const [purchasingUsers, setPurchasingUsers] = useState<User[]>([]);
     const [editingImages, setEditingImages] = useState<{[productIndex: number]: {existing: string[], new: File[]}}>({});
     const [translatedFields, setTranslatedFields] = useState<{[productId: string]: {[fieldName: string]: string}}>({});
 
@@ -137,18 +137,18 @@ export default function RFQDetailClient() {
                     
                     const { getDocs, collection } = await import('firebase/firestore');
                     const usersSnapshot = await getDocs(collection(db, 'users'));
-                    const users = usersSnapshot.docs.map(doc => ({
+                    const usersData = usersSnapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
-                    }));
-                    setUsers(users);
+                    })) as User[];
+                    setUsers(usersData);
 
-                    const activePurchasingUsers = users.filter(u => 
+                    const activePurchasingUsers = usersData.filter(u => 
                         u.role === 'Purchasing' && u.status === 'Active'
                     );
                     setPurchasingUsers(activePurchasingUsers);
                     
-                    const foundCreator = users.find(u => u.id === rfqData.creatorId);
+                    const foundCreator = usersData.find(u => u.id === rfqData.creatorId);
                     setCreator(foundCreator || null);
                 } else {
                     toast({
@@ -196,6 +196,7 @@ export default function RFQDetailClient() {
             case 'Locked': return 'destructive';
             case 'Quotation in Progress': return 'default';
             case 'Quotation Completed': return 'outline';
+            case 'Sent': return 'default';
             case 'Archived': return 'destructive';
             default: return 'secondary';
         }
@@ -359,17 +360,27 @@ export default function RFQDetailClient() {
         try {
             let updatedQuotes: Quote[];
             const isUpdate = !!existingQuote;
+            const salesCostPriceRMB = price; // Original RMB input
+            const salesCostPriceUSD = convertRMBToUSD(price); // RMB ÷ 7.25
+            const customizedProductPriceUSD = calculateCustomizedPrice(price); // (RMB ÷ 2.7 + 40) × 1.075
+
 
             if (isUpdate) {
                 updatedQuotes = rfq.quotes.map(q =>
                     q.productId === productId && q.purchaserId === user.id
-                    ? { ...q, 
-                        price,
-                        priceUSD: convertRMBToUSD(price), 
+                    ? { 
+                        ...q, 
+                        salesCostPriceRMB,
+                        salesCostPriceUSD,
+                        customizedProductPriceUSD,
+                        // Keep backward compatibility
+                        price: salesCostPriceRMB,
+                        priceUSD: salesCostPriceUSD,
                         deliveryDate: deliveryDate.toISOString(), 
                         quoteTime: new Date().toISOString(), 
-                        notes: message }
-                        : q
+                        notes: message 
+                    }
+                    : q
                 );
             } else {
                 const newQuote: Quote = {
@@ -377,12 +388,16 @@ export default function RFQDetailClient() {
                     rfqId: rfq.id,
                     productId,
                     purchaserId: user.id,
-                    price,
-                    priceUSD: convertRMBToUSD(price),
+                    salesCostPriceRMB,
+                    salesCostPriceUSD,
+                    customizedProductPriceUSD,
+                    // Keep backward compatibility
+                    price: salesCostPriceRMB,
+                    priceUSD: salesCostPriceUSD,
                     deliveryDate: deliveryDate.toISOString(),
                     quoteTime: new Date().toISOString(),
                     status: 'Pending Acceptance',
-                    notes: message // Add the message here
+                    notes: message
                 };
                 updatedQuotes = [...rfq.quotes, newQuote];
             }
@@ -577,6 +592,44 @@ export default function RFQDetailClient() {
                     };
                 })
             );
+
+            const handleMarkAsSent = async () => {
+                if (!rfq || !user || user.role !== 'Sales' || user.id !== rfq.creatorId) return;
+            
+                try {
+                    const docRef = doc(db, "rfqs", rfq.id);
+                    await updateDoc(docRef, {
+                        status: 'Sent' as RFQStatus,
+                        sentAt: serverTimestamp(),
+                        sentBy: user.id,
+                        lastUpdatedTime: serverTimestamp(),
+                    });
+            
+                    setRfq(prev => prev ? { ...prev, status: 'Sent' } : null);
+            
+                    await addActionHistory(
+                        rfq.id,
+                        'rfq_sent',
+                        {
+                            previousStatus: rfq.status,
+                            newStatus: 'Sent'
+                        }
+                    );
+            
+                    toast({
+                        title: t('rfq_sent_title'),
+                        description: t('rfq_sent_description'),
+                    });
+            
+                } catch (error) {
+                    console.error('Error marking RFQ as sent:', error);
+                    toast({
+                        variant: "destructive",
+                        title: "Error",
+                        description: "Failed to mark RFQ as sent. Please try again.",
+                    });
+                }
+            };
             
             console.log('🔧 Preparing RFQ update data...');
             const updatedRfqData = {
@@ -832,13 +885,7 @@ export default function RFQDetailClient() {
                     </h1>
                     <div className="flex items-center gap-4 mt-2">
                         <p className="text-muted-foreground">
-                            {t('field_label_inquiry_time')}: {
-                                rfq.inquiryTime?.seconds 
-                                    ? formatFirestoreDate(new Date(rfq.inquiryTime.seconds * 1000))
-                                    : rfq.inquiryTime 
-                                        ? formatFirestoreDate(rfq.inquiryTime)
-                                        : 'N/A'
-                            }
+                            {t('field_label_inquiry_time')}: {formatFirestoreDate(rfq.inquiryTime)}
                         </p>
                         {rfq.status === 'Locked' && rfq.lockedBy && (
                             <p className="text-sm text-muted-foreground">
@@ -882,6 +929,18 @@ export default function RFQDetailClient() {
                     >
                         <Edit className="h-4 w-4" />
                         {isEditing ? 'Cancel Edit' : 'Edit RFQ'}
+                    </Button>
+                )}
+                {user?.role === 'Sales' && 
+                user.id === rfq.creatorId && 
+                rfq.status === 'Quotation Completed' && (
+                    <Button
+                        variant="default"
+                        onClick={handleMarkAsSent}
+                        className="flex items-center gap-2"
+                    >
+                        <Send className="h-4 w-4" />
+                        {t('button_mark_as_sent')}
                     </Button>
                 )}
             </div>
@@ -1415,15 +1474,39 @@ export default function RFQDetailClient() {
                                                     </p>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                {quote.status === 'Abandoned' ? (
-                                                    <p className="text-lg font-bold text-orange-600">Quote Abandoned</p>
-                                                ) : (
-                                                    <p className="text-lg font-bold text-blue-600">
-                                                    {quote.priceUSD ? formatUSD(quote.priceUSD) : (quote.price ? `$${(quote.price / 7.25).toFixed(2)}` : 'N/A')}
-                                                    </p>
-                                                )}
-                                                </div>
+                                                {/* Replace the existing price display section with this */}
+                                                    <div className="text-right">
+                                                        {quote.status === 'Abandoned' ? (
+                                                            <p className="text-lg font-bold text-orange-600">Quote Abandoned</p>
+                                                        ) : (
+                                                            <div className="space-y-1">
+                                                                {user?.role === 'Purchasing' ? (
+                                                                    // Purchasers see all three prices
+                                                                    <>
+                                                                        <p className="text-sm text-muted-foreground">Sales Cost Price:</p>
+                                                                        <p className="text-lg font-bold text-blue-600">
+                                                                            {formatRMB(quote.salesCostPriceRMB || quote.price || 0)}
+                                                                        </p>
+                                                                        <p className="text-sm text-blue-500">
+                                                                            ${(quote.salesCostPriceUSD || quote.priceUSD || 0).toFixed(2)} USD
+                                                                        </p>
+                                                                        <p className="text-sm text-muted-foreground mt-1">Customized Price:</p>
+                                                                        <p className="text-sm font-semibold text-green-600">
+                                                                            ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
+                                                                        </p>
+                                                                    </>
+                                                                ) : (
+                                                                    // Sales see only the Customized Product Price
+                                                                    <>
+                                                                        <p className="text-sm text-muted-foreground">Customer Price:</p>
+                                                                        <p className="text-lg font-bold text-green-600">
+                                                                            ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
+                                                                        </p>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 
                                                 {/* Message section - NEW */}
@@ -1641,15 +1724,17 @@ export default function RFQDetailClient() {
                             setIsEditing(false);
                             setEditingImages({});
                             // Reset form to original values
-                            editForm.reset({
-                                customerType: rfq.customerType,
-                                customerEmail: rfq.customerEmail,
-                                assignedPurchaserIds: rfq.assignedPurchaserIds,
-                                products: rfq.products.map(product => ({
-                                    ...product,
-                                    imageFiles: []
-                                }))
-                            });
+                            if(rfq) {
+                                editForm.reset({
+                                    customerType: rfq.customerType,
+                                    customerEmail: rfq.customerEmail,
+                                    assignedPurchaserIds: rfq.assignedPurchaserIds,
+                                    products: rfq.products.map(product => ({
+                                        ...product,
+                                        imageFiles: []
+                                    }))
+                                });
+                            }
                         }}
                     >
                         Cancel

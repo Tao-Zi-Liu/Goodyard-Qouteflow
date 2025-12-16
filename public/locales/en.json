@@ -62,7 +62,7 @@
     "notification_quote_updated_title": "Quote Updated",
     "notification_quote_updated_body": "{purchaserName} has updated their quote for RFQ {rfqCode}.",
     "field_product_series": "Product Series",
-    "field_sku": "SKU",
+    "field_sku": " Reference SKU",
     "field_quantity": "Quantity",
     "field_hair_fiber": "Hair Fiber",
     "field_cap": "Cap",
@@ -159,5 +159,9 @@
     "characters": "characters", 
     "submitting": "Submitting...",
     "update_quote": "Update Quote",
-    "submit_quote_rmb": "Submit Quote (RMB)"
+    "submit_quote_rmb": "Submit Quote (RMB)",
+    "status_sent": "Sent",
+    "button_mark_as_sent": "Mark as Sent", 
+    "rfq_sent_title": "RFQ Sent",
+    "rfq_sent_description": "RFQ has been successfully marked as sent to customer"
     }
