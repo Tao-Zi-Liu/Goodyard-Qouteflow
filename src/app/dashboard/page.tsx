@@ -1,4 +1,5 @@
 
+
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -416,6 +417,9 @@ export default function DashboardPage() {
                         <TableHead>{t('header_status')}</TableHead>
                         <TableHead>{t('field_customer_type')}</TableHead>
                         <TableHead>{t('field_customer_email')}</TableHead>
+                        <TableHead>Ref. SKU</TableHead>
+                        <TableHead>Color</TableHead>
+                        <TableHead>Length</TableHead>
                         <TableHead>{t('header_sale_price')}</TableHead>
                         <TableHead>{t('field_label_inquiry_time')}</TableHead>
                         <TableHead>{t('header_last_updated')}</TableHead>
@@ -428,7 +432,8 @@ export default function DashboardPage() {
                             const isAssignedPurchaser = user?.role === 'Purchasing' && rfq.assignedPurchaserIds.includes(user?.id || '');
                             const canToggleLock = isAssignedPurchaser && (rfq.status === 'Waiting for Quote' || rfq.status === 'Locked');
                             const isLocked = rfq.status === 'Locked';
-                            
+                            const firstProduct = rfq.products && rfq.products.length > 0 ? rfq.products[0] : null;
+
                             return (
                                 <TableRow key={rfq.id}>
                                     <TableCell 
@@ -451,6 +456,9 @@ export default function DashboardPage() {
                                     </TableCell>
                                     <TableCell>{rfq.customerType || 'N/A'}</TableCell>
                                     <TableCell>{rfq.customerEmail || 'N/A'}</TableCell>
+                                    <TableCell>{firstProduct?.sku || 'N/A'}</TableCell>
+                                    <TableCell>{firstProduct?.color || 'N/A'}</TableCell>
+                                    <TableCell>{firstProduct?.length || 'N/A'}</TableCell>
                                     <TableCell>
                                             <div className="space-y-1">
                                                 {rfq.quotes && rfq.quotes.length > 0 ? (
@@ -689,3 +697,4 @@ export default function DashboardPage() {
         </div>
     );
 }
+
