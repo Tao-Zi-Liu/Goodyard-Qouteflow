@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Eye, FileText, Users } from 'lucide-react';
+import { PlusCircle, FileText, Users } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useI18n } from '@/hooks/use-i18n';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -442,7 +442,7 @@ export default function DashboardPage() {
                         <TableHead>{t('header_status')}</TableHead>
                         <TableHead>{t('field_customer_type')}</TableHead>
                         <TableHead>{t('field_customer_email')}</TableHead>
-                        <TableHead>{t('header_quotes')}</TableHead>
+                        <TableHead>{t('header_sale_price')}</TableHead>
                         <TableHead>{t('field_label_inquiry_time')}</TableHead>
                         <TableHead>{t('header_last_updated')}</TableHead>
                         <TableHead>{t('header_creator')}</TableHead>
@@ -457,7 +457,12 @@ export default function DashboardPage() {
                             
                             return (
                                 <TableRow key={rfq.id}>
-                                    <TableCell className="font-medium">{rfq.rfqCode || rfq.code || `RFQ-${rfq.id.slice(0,6)}`}</TableCell>
+                                    <TableCell 
+                                        className="font-medium underline cursor-pointer hover:text-primary"
+                                        onClick={() => router.push(`/dashboard/rfq/${rfq.id}`)}
+                                    >
+                                        {rfq.rfqCode || rfq.code || `RFQ-${rfq.id.slice(0,6)}`}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
                                             <Badge variant={getStatusVariant(rfq.status)}>
@@ -530,9 +535,6 @@ export default function DashboardPage() {
                                                     <X className="h-4 w-4" />
                                                 </Button>
                                             )}
-                                            <Button variant="ghost" size="icon" onClick={() => router.push(`/dashboard/rfq/${rfq.id}`)}>
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
                                         </div>
                                     </TableCell>
                                 </TableRow>
