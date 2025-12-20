@@ -354,6 +354,7 @@ export default function DashboardPage() {
             case 'Sent': return 'default';
             case 'Abandoned': return 'destructive';
             case 'Closed': return 'secondary';
+            case 'Canceled':
             case 'Archived': return 'destructive';
             default: return 'secondary';
         }
@@ -685,7 +686,7 @@ export default function DashboardPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold">
-                                {rfqs.filter(r => r.status !== 'Quotation Completed' && r.status !== 'Archived').length}
+                                {rfqs.filter(r => !['Quotation Completed', 'Archived', 'Canceled', 'Sent'].includes(r.status)).length}
                             </div>
                             <p className="text-xs text-muted-foreground">
                                 Awaiting quotes or in progress
@@ -697,4 +698,3 @@ export default function DashboardPage() {
         </div>
     );
 }
-

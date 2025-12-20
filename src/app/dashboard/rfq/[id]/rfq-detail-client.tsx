@@ -33,6 +33,17 @@ import { AbandonQuoteDialog } from '@/components/abandon-quote-dialog';
 import { TranslateButton } from '@/components/translate-button';
 import { translateText } from '@/lib/translate';
 import { formatRMB, formatUSD } from '@/lib/currency';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
 const formatFirestoreDate = (date: any): string => {
     if (!date) return 'N/A';
@@ -197,7 +208,10 @@ export default function RFQDetailClient() {
             case 'Quotation in Progress': return 'default';
             case 'Quotation Completed': return 'outline';
             case 'Sent': return 'default';
-            case 'Archived': return 'destructive';
+            case 'Canceled':
+            case 'Archived': 
+            case 'Abandoned':
+                return 'destructive';
             default: return 'secondary';
         }
     };
@@ -263,7 +277,7 @@ export default function RFQDetailClient() {
             const docRef = doc(db, "rfqs", rfq.id);
             await updateDoc(docRef, updatedRfqData);
     
-            const updatedRfq = { ...rfq, ...updatedRfqData };
+            const updatedRfq = { ...rfq, ...updatedRfqData, status: newStatus };
             setRfq(updatedRfq);
     
             await addActionHistory(
@@ -295,7 +309,7 @@ export default function RFQDetailClient() {
                         recipientId: salesUser.id,
                         titleKey: 'notification_rfq_ready_to_send_title',
                         bodyKey: 'notification_rfq_ready_to_send_body',
-                        bodyParams: { rfqCode: rfq.rfqCode || rfq.code },
+                        bodyParams: { rfqCode: rfq.rfqCode || rfq.code || rfq.id },
                         href: `/dashboard/rfq/${rfq.id}`,
                     });
                 }
@@ -431,7 +445,7 @@ export default function RFQDetailClient() {
             const docRef = doc(db, "rfqs", rfq.id);
             await updateDoc(docRef, updatedRfqData);
 
-            const updatedRfq = { ...rfq, ...updatedRfqData };
+            const updatedRfq = { ...rfq, ...updatedRfqData, status: 'Quotation in Progress' as RFQStatus };
             setRfq(updatedRfq);
 
             await addActionHistory(
@@ -503,7 +517,7 @@ export default function RFQDetailClient() {
             const docRef = doc(db, "rfqs", rfq.id);
             await updateDoc(docRef, updatedRfqData);
     
-            const updatedRfq = { ...rfq, ...updatedRfqData };
+            const updatedRfq = { ...rfq, ...updatedRfqData, status: newStatus };
             setRfq(updatedRfq);
     
             await addActionHistory(
@@ -695,6 +709,46 @@ export default function RFQDetailClient() {
         }
     };
 
+    const handleCancelRfq = async () => {
+        if (!rfq || !user) return;
+        if (user.id !== rfq.creatorId && user.role !== 'Admin') return;
+    
+        try {
+          const docRef = doc(db, "rfqs", rfq.id);
+          const previousStatus = rfq.status;
+          const newStatus = 'Canceled' as RFQStatus;
+    
+          await updateDoc(docRef, {
+            status: newStatus,
+            lastUpdatedTime: serverTimestamp(),
+          });
+    
+          setRfq(prev => prev ? { ...prev, status: newStatus } : null);
+    
+          await addActionHistory(
+            rfq.id,
+            'rfq_canceled',
+            {
+              previousStatus: previousStatus,
+              newStatus: newStatus
+            }
+          );
+    
+          toast({
+            title: t('rfq_canceled_title'),
+            description: t('rfq_canceled_description', { rfqCode: rfq.rfqCode || rfq.code }),
+          });
+    
+        } catch (error) {
+          console.error('Error canceling RFQ:', error);
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to cancel the RFQ.",
+          });
+        }
+      };
+
     const handleRemoveImage = (productIndex: number, imageIndex: number) => {
         setEditingImages(prev => {
             const updated = { ...prev };
@@ -862,6 +916,7 @@ export default function RFQDetailClient() {
         };
     
         const isUserAssigned = rfq?.assignedPurchaserIds?.includes(user?.id || '') || false;
+        const canCancel = user && rfq && (user.id === rfq.creatorId || user.role === 'Admin') && !['Canceled', 'Archived', 'Sent'].includes(rfq.status);
     
         if (loading) {
             return (
@@ -909,7 +964,7 @@ export default function RFQDetailClient() {
                          {rfq.status === 'Sent' && (
                             <p className="text-sm font-semibold text-green-600 flex items-center gap-1">
                                 <CheckCircle className="h-4 w-4"/>
-                                {t('rfq_sent_to_customer')}
+                                {t('rfq_sent_to_customer')} by {users.find(u => u.id === rfq.sentBy)?.name || 'Unknown'} on {formatFirestoreDate(rfq.sentAt)}
                             </p>
                         )}
                     </div>
@@ -963,6 +1018,31 @@ export default function RFQDetailClient() {
                         <Send className="h-4 w-4" />
                         {t('button_mark_as_sent')}
                     </Button>
+                )}
+                {/* Cancel RFQ Button */}
+                {canCancel && (
+                    <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button variant="destructive" className="flex items-center gap-2">
+                        <XCircle className="h-4 w-4" />
+                        {t('button_cancel_rfq')}
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>{t('cancel_rfq_confirmation_title')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {t('cancel_rfq_confirmation_body')}
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>Back</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleCancelRfq}>
+                            {t('button_confirm_cancel')}
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                    </AlertDialog>
                 )}
             </div>
     {/* Main Content Grid */}

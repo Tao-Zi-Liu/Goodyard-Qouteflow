@@ -20,7 +20,7 @@ export interface User {
   updatedAt?: string; // When the user was last updated
 }
 
-export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed'| 'Sent'   | 'Abandoned' | 'Closed' | 'Archived';
+export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed'| 'Sent'   | 'Abandoned' | 'Closed' | 'Archived' | 'Canceled';
 export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee';
 
 export interface Product {
@@ -78,7 +78,8 @@ export type ActionType =
   | 'status_changed'
   | 'rfq_sent'
   | 'rfq_edited'
-  | 'quote_abandoned';
+  | 'quote_abandoned'
+  | 'rfq_canceled';
 
   export interface ActionHistory {
     id: string;
@@ -113,6 +114,8 @@ export interface RFQ {
   actionHistory?: ActionHistory[];
   lastUpdatedTime?: any; // NEW FIELD: Track last update for quotes, locks, and edits
   rfqCode?: string; // Optional RFQ code field
+  sentBy?: string; // User ID of who marked as sent
+  sentAt?: any; // Timestamp of when it was sent
 }
 
 export interface AppNotification {
