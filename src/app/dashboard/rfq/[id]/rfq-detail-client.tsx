@@ -235,11 +235,11 @@ export default function RFQDetailClient() {
 
     const handleAcceptQuote = async (productId: string, purchaserId: string) => {
         if (!rfq || !user || user.role !== 'Sales') return;
-
+    
         try {
             const acceptedQuote = rfq.quotes.find(q => q.productId === productId && q.purchaserId === purchaserId);
             if (!acceptedQuote) throw new Error("Quote not found");
-
+    
             const updatedQuotes = rfq.quotes.map(q => {
                 if (q.productId === productId) {
                     return q.purchaserId === purchaserId
@@ -248,24 +248,24 @@ export default function RFQDetailClient() {
                 }
                 return q;
             });
-
+    
             const allProductsQuoted = rfq.products.every(p =>
                 updatedQuotes.some(q => q.productId === p.id && q.status === 'Accepted')
             );
             const newStatus = allProductsQuoted ? 'Quotation Completed' : rfq.status;
-
+    
             const updatedRfqData = {
                 quotes: updatedQuotes,
                 status: newStatus,
                 lastUpdatedTime: serverTimestamp(),
             };
-
+    
             const docRef = doc(db, "rfqs", rfq.id);
             await updateDoc(docRef, updatedRfqData);
-
+    
             const updatedRfq = { ...rfq, ...updatedRfqData };
             setRfq(updatedRfq);
-
+    
             await addActionHistory(
                 rfq.id,
                 'quote_accepted',
@@ -278,7 +278,7 @@ export default function RFQDetailClient() {
                     newStatus: newStatus
                 }
             );
-
+    
             createNotification({
                 recipientId: acceptedQuote.purchaserId,
                 titleKey: 'notification_quote_accepted_title',
@@ -287,6 +287,20 @@ export default function RFQDetailClient() {
                 href: `/dashboard/rfq/${rfq.id}`,
             });
 
+            // If the RFQ is now complete, notify all Sales users that it's ready to be sent
+            if (newStatus === 'Quotation Completed') {
+                const salesUsers = users.filter(u => u.role === 'Sales' && u.status === 'Active');
+                for (const salesUser of salesUsers) {
+                    createNotification({
+                        recipientId: salesUser.id,
+                        titleKey: 'notification_rfq_ready_to_send_title',
+                        bodyKey: 'notification_rfq_ready_to_send_body',
+                        bodyParams: { rfqCode: rfq.rfqCode || rfq.code },
+                        href: `/dashboard/rfq/${rfq.id}`,
+                    });
+                }
+            }
+    
             toast({
                 title: "Quote Accepted",
                 description: "The quote has been accepted.",
@@ -1497,7 +1511,7 @@ export default function RFQDetailClient() {
                                                                         <p className="text-sm text-blue-500">
                                                                             ${(quote.salesCostPriceUSD || quote.priceUSD || 0).toFixed(2)} USD
                                                                         </p>
-                                                                        <p className="text-sm text-muted-foreground mt-1">Sale Price:</p>
+                                                                        <p className="text-sm text-muted-foreground mt-1">{t('header_sale_price')}:</p>
                                                                         <p className="text-sm font-semibold text-green-600">
                                                                             ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
                                                                         </p>
@@ -1505,7 +1519,7 @@ export default function RFQDetailClient() {
                                                                 ) : (
                                                                     // Sales see only the Customized Product Price
                                                                     <>
-                                                                        <p className="text-sm text-muted-foreground">Sale Price:</p>
+                                                                        <p className="text-sm text-muted-foreground">{t('header_sale_price')}:</p>
                                                                         <p className="text-lg font-bold text-green-600">
                                                                             ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
                                                                         </p>
