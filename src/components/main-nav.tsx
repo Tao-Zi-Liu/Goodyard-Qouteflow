@@ -61,7 +61,7 @@ export function MainNav({ userRole }: MainNavProps) {
                     >
                         <Link href={item.href}>
                             <item.icon />
-                            <span>{t(item.labelKey)}</span>
+                            <span className="group-data-[collapsible=icon]:hidden">{t(item.labelKey)}</span>
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
