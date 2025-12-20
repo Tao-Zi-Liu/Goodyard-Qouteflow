@@ -1,3 +1,4 @@
+
 "use client";
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
@@ -54,7 +55,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <SidebarFooter/>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 sm:px-6">
+        <header className="flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
             <SidebarTrigger className="flex-shrink-0">
               <Menu className="h-4 w-4" />
               <span className="sr-only">Toggle Sidebar</span>
