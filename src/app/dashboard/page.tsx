@@ -1,3 +1,4 @@
+
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, FileText, Users } from 'lucide-react';
+import { PlusCircle, FileText, Users, Send } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { useI18n } from '@/hooks/use-i18n';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -17,9 +18,9 @@ import { Input } from "@/components/ui/input";
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Lock, Unlock,X } from 'lucide-react';
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { convertRMBToSalesUSD } from '@/lib/currency';
 import { useToast } from '@/hooks/use-toast';
-import { formatRMB } from '@/lib/currency';
+import { Checkbox } from '@/components/ui/checkbox';
+
 
 export default function DashboardPage() {
     const router = useRouter();
@@ -349,6 +350,7 @@ export default function DashboardPage() {
             case 'Locked': return 'destructive';
             case 'Quotation in Progress': return 'default';
             case 'Quotation Completed': return 'outline';
+            case 'Sent': return 'default';
             case 'Abandoned': return 'destructive';
             case 'Closed': return 'secondary';
             case 'Archived': return 'destructive';
@@ -366,34 +368,6 @@ export default function DashboardPage() {
         rfq.assignedPurchaserIds?.includes(user?.id || '') && 
         rfq.status !== 'Quotation Completed'
     );
-
-    const formatRMB = (amount: number): string => {
-        return `¥${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      };
-      
-      const getTotalQuoteValue = (rfq: RFQ): number => {
-        if (!rfq.quotes || rfq.quotes.length === 0) return 0;
-        return rfq.quotes
-          .filter(quote => quote.status === 'Accepted' && quote.price)
-          .reduce((total, quote) => total + (quote.price || 0), 0);
-      };
-      
-      const getQuotesByPurchaser = (rfq: RFQ) => {
-        if (!rfq.quotes || rfq.quotes.length === 0) return [];
-        
-        const quotesByPurchaser = rfq.quotes.reduce((acc, quote) => {
-          if (quote.status === 'Accepted' && quote.price) {
-            const purchaserName = allUsers.find(u => u.id === quote.purchaserId)?.name || 'Unknown';
-            if (!acc[purchaserName]) {
-              acc[purchaserName] = 0;
-            }
-            acc[purchaserName] += quote.price;
-          }
-          return acc;
-        }, {} as Record<string, number>);
-        
-        return Object.entries(quotesByPurchaser);
-      };
 
     const RFQTable = ({ data }: { data: RFQ[] }) => {
         const paginatedData = getPaginatedData(data);
@@ -446,7 +420,7 @@ export default function DashboardPage() {
                         <TableHead>{t('field_label_inquiry_time')}</TableHead>
                         <TableHead>{t('header_last_updated')}</TableHead>
                         <TableHead>{t('header_creator')}</TableHead>
-                        <TableHead className="text-right">{t('header_actions')}</TableHead>
+                        <TableHead className="text-right">{t('header_sent')}</TableHead>
                     </TableRow>
                 </TableHeader>
                     <TableBody>
@@ -509,33 +483,11 @@ export default function DashboardPage() {
                                     </TableCell>
                                     <TableCell>{getCreatorName(rfq.creatorId)}</TableCell>
                                     <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            {canToggleLock && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => handleLockToggle(rfq)}
-                                                    title={isLocked ? t('button_unlock_rfq') : t('button_lock_rfq')}
-                                                >
-                                                    {isLocked ? (
-                                                        <Unlock className="h-4 w-4 text-green-600" />
-                                                    ) : (
-                                                        <Lock className="h-4 w-4 text-orange-600" />
-                                                    )}
-                                                </Button>
-                                            )}
-                                            {user?.role === 'Sales' && rfq.creatorId === user.id && rfq.status === 'Waiting for Quote' && (
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => handleCloseRfq(rfq)}
-                                                    title={t('close_rfq')}
-                                                    className="text-orange-600 hover:text-orange-700"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
+                                        <Checkbox
+                                            checked={rfq.status === 'Sent'}
+                                            disabled
+                                            aria-label="Sent status"
+                                        />
                                     </TableCell>
                                 </TableRow>
                             );

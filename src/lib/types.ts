@@ -75,7 +75,8 @@ export type ActionType =
   | 'quote_updated' 
   | 'quote_accepted' 
   | 'quote_rejected'
-  | 'status_changed';
+  | 'status_changed'
+  | 'rfq_sent';
 
   export interface ActionHistory {
     id: string;

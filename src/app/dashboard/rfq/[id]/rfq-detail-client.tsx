@@ -592,44 +592,6 @@ export default function RFQDetailClient() {
                     };
                 })
             );
-
-            const handleMarkAsSent = async () => {
-                if (!rfq || !user || user.role !== 'Sales' || user.id !== rfq.creatorId) return;
-            
-                try {
-                    const docRef = doc(db, "rfqs", rfq.id);
-                    await updateDoc(docRef, {
-                        status: 'Sent' as RFQStatus,
-                        sentAt: serverTimestamp(),
-                        sentBy: user.id,
-                        lastUpdatedTime: serverTimestamp(),
-                    });
-            
-                    setRfq(prev => prev ? { ...prev, status: 'Sent' } : null);
-            
-                    await addActionHistory(
-                        rfq.id,
-                        'rfq_sent',
-                        {
-                            previousStatus: rfq.status,
-                            newStatus: 'Sent'
-                        }
-                    );
-            
-                    toast({
-                        title: t('rfq_sent_title'),
-                        description: t('rfq_sent_description'),
-                    });
-            
-                } catch (error) {
-                    console.error('Error marking RFQ as sent:', error);
-                    toast({
-                        variant: "destructive",
-                        title: "Error",
-                        description: "Failed to mark RFQ as sent. Please try again.",
-                    });
-                }
-            };
             
             console.log('🔧 Preparing RFQ update data...');
             const updatedRfqData = {
@@ -677,6 +639,44 @@ export default function RFQDetailClient() {
                 variant: "destructive",
                 title: "Error",
                 description: "Failed to update the RFQ. Please try again.",
+            });
+        }
+    };
+
+    const handleMarkAsSent = async () => {
+        if (!rfq || !user || user.role !== 'Sales' || user.id !== rfq.creatorId) return;
+    
+        try {
+            const docRef = doc(db, "rfqs", rfq.id);
+            await updateDoc(docRef, {
+                status: 'Sent' as RFQStatus,
+                sentAt: serverTimestamp(),
+                sentBy: user.id,
+                lastUpdatedTime: serverTimestamp(),
+            });
+    
+            setRfq(prev => prev ? { ...prev, status: 'Sent' } : null);
+    
+            await addActionHistory(
+                rfq.id,
+                'rfq_sent',
+                {
+                    previousStatus: rfq.status,
+                    newStatus: 'Sent'
+                }
+            );
+    
+            toast({
+                title: t('rfq_sent_title'),
+                description: t('rfq_sent_description'),
+            });
+    
+        } catch (error) {
+            console.error('Error marking RFQ as sent:', error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to mark RFQ as sent. Please try again.",
             });
         }
     };
@@ -931,6 +931,8 @@ export default function RFQDetailClient() {
                         {isEditing ? 'Cancel Edit' : 'Edit RFQ'}
                     </Button>
                 )}
+
+                {/* Mark as Sent Button */}
                 {user?.role === 'Sales' && 
                 user.id === rfq.creatorId && 
                 rfq.status === 'Quotation Completed' && (
