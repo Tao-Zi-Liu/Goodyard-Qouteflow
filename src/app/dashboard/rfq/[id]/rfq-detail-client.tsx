@@ -1490,7 +1490,7 @@ export default function RFQDetailClient() {
                                                                         <p className="text-sm text-blue-500">
                                                                             ${(quote.salesCostPriceUSD || quote.priceUSD || 0).toFixed(2)} USD
                                                                         </p>
-                                                                        <p className="text-sm text-muted-foreground mt-1">Customized Price:</p>
+                                                                        <p className="text-sm text-muted-foreground mt-1">Sale Price:</p>
                                                                         <p className="text-sm font-semibold text-green-600">
                                                                             ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
                                                                         </p>
@@ -1498,7 +1498,7 @@ export default function RFQDetailClient() {
                                                                 ) : (
                                                                     // Sales see only the Customized Product Price
                                                                     <>
-                                                                        <p className="text-sm text-muted-foreground">Customer Price:</p>
+                                                                        <p className="text-sm text-muted-foreground">Sale Price:</p>
                                                                         <p className="text-lg font-bold text-green-600">
                                                                             ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
                                                                         </p>

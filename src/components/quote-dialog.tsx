@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -114,7 +115,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
                         <span className="font-medium">{formatUSD(salesCostUSD)}</span>
                       </div>
                       <div className="flex justify-between border-t pt-1">
-                        <span>Customer Price (USD):</span>
+                        <span>Sale Price (USD):</span>
                         <span className="font-medium text-green-600">{formatUSD(customizedPriceUSD)}</span>
                       </div>
                     </div>
