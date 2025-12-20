@@ -644,7 +644,7 @@ export default function RFQDetailClient() {
     };
 
     const handleMarkAsSent = async () => {
-        if (!rfq || !user || user.role !== 'Sales' || user.id !== rfq.creatorId) return;
+        if (!rfq || !user || user.role !== 'Sales') return;
     
         try {
             const docRef = doc(db, "rfqs", rfq.id);
@@ -892,6 +892,12 @@ export default function RFQDetailClient() {
                                 {t('locked_by', { userName: users.find(u => u.id === rfq.lockedBy)?.name || 'Unknown' })}
                             </p>
                         )}
+                         {rfq.status === 'Sent' && (
+                            <p className="text-sm font-semibold text-green-600 flex items-center gap-1">
+                                <CheckCircle className="h-4 w-4"/>
+                                {t('rfq_sent_to_customer')}
+                            </p>
+                        )}
                     </div>
                 </div>
                 
@@ -934,7 +940,6 @@ export default function RFQDetailClient() {
 
                 {/* Mark as Sent Button */}
                 {user?.role === 'Sales' && 
-                user.id === rfq.creatorId && 
                 rfq.status === 'Quotation Completed' && (
                     <Button
                         variant="default"
