@@ -17,6 +17,7 @@ const productSchema = z.object({
   density: z.string().optional(),
   color: z.string().optional(),
   curlStyle: z.string().optional(),
+  specialNotes: z.string().optional(),
   wigCapConstruction: z.string().optional(),
   baseSize: z.string().optional(),
   extensionType: z.string().optional(),

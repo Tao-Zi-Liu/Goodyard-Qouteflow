@@ -180,7 +180,7 @@ export default function RFQDetailClient() {
         if (rfq && language === 'zh') {
           // Auto-translate all product parameters to Chinese
           rfq.products.forEach(product => {
-            ['hairFiber', 'cap', 'capSize', 'length', 'density', 'color', 'curlStyle'].forEach(field => {
+            ['hairFiber', 'cap', 'capSize', 'length', 'density', 'color', 'curlStyle', 'specialNotes'].forEach(field => {
               if (product[field] && !isChineseText(product[field])) {
                 translateText(product[field], 'zh').then(result => {
                   setTranslatedFields(prev => ({
@@ -1519,7 +1519,30 @@ export default function RFQDetailClient() {
                                     </div>
                                 </div>
                                 </div>
-                                    
+                                    {/* Special Notes */}
+                                    {product.specialNotes && (
+                                    <div className="col-span-2 mt-2">
+                                        <span className="text-muted-foreground">{t('field_special_notes')}:</span>
+                                        <div className="flex items-center gap-2 mt-1">
+                                        <p className="font-medium flex-1 whitespace-pre-wrap bg-muted/40 rounded-md px-3 py-2 text-sm">
+                                            {translatedFields[product.id]?.specialNotes || product.specialNotes}
+                                        </p>
+                                        <TranslateButton
+                                            text={product.specialNotes}
+                                            onTranslate={(translatedText) => {
+                                            setTranslatedFields(prev => ({
+                                                ...prev,
+                                                [product.id]: {
+                                                ...prev[product.id],
+                                                specialNotes: translatedText
+                                                }
+                                            }));
+                                            }}
+                                            className="h-6 w-6"
+                                        />
+                                        </div>
+                                    </div>
+                                    )}
                                     {/* Product Images Display */}
                                     {product.images && product.images.length > 0 && (
                                        <div className="mt-4 mb-6">

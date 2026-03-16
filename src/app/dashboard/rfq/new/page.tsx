@@ -658,6 +658,7 @@ const handleSave = async () => {
         density: product.density,
         color: product.color,
         curlStyle: product.curlStyle,
+        specialNotes: product.specialNotes || '',
         quantity: product.quantity || 1,
         images: imageUrls // Only include the uploaded URLs, not File objects
         // Explicitly exclude imageFiles and any other File objects
@@ -929,8 +930,14 @@ const handleSave = async () => {
                             <div><span className="font-medium text-muted-foreground">Length:</span> {product.length}</div>
                             <div><span className="font-medium text-muted-foreground">Density:</span> {product.density}</div>
                             <div><span className="font-medium text-muted-foreground">Color:</span> {product.color}</div>
-                            <div><span className="font-medium text-muted-foreground">Curls:</span> {product.curlStyle}</div>
+                            <div><span className="font-medium text-muted-foreground">Hair Texture:</span> {product.curlStyle}</div>
                          </div>
+                         {product.specialNotes && (
+                        <div className="col-span-2">
+                          <span className="font-medium text-muted-foreground">Special Notes:</span>
+                          <p className="mt-1 text-sm whitespace-pre-wrap">{product.specialNotes}</p>
+                        </div>
+                      )}
                     </CardContent>
                 </Card>
               ))}
