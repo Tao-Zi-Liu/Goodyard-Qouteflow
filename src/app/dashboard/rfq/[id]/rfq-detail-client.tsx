@@ -1330,11 +1330,34 @@ export default function RFQDetailClient() {
                                     <CardDescription>WLID: {product.wlid}</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    {product.imageUrl && (
-                                        <div className="mb-6 flex justify-center">
-                                            <img src={product.imageUrl} alt={product.sku} className="max-h-60 object-contain rounded-md" />
+                                {product.images && product.images.length > 0 && (
+                                    <div className="mb-6">
+                                        <span className="text-sm text-muted-foreground">{t('product_images')}:</span>
+                                        <div className="grid grid-cols-4 gap-2 mt-2">
+                                            {product.images.map((imageUrl: string, index: number) => (
+                                                <div
+                                                    key={index}
+                                                    className="relative group cursor-pointer"
+                                                    onClick={() => {
+                                                        setSelectedImage(imageUrl);
+                                                        setIsImageModalOpen(true);
+                                                    }}
+                                                >
+                                                    <img
+                                                        src={imageUrl}
+                                                        alt={`Product ${index + 1}`}
+                                                        className="w-full h-24 object-cover rounded-lg border hover:opacity-75 transition-opacity"
+                                                    />
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <div className="bg-black/50 rounded-full p-2">
+                                                            <Eye className="h-4 w-4 text-white" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                    )}
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-1 gap-y-4 text-sm mb-6">
                                 <div className="grid grid-cols-2 gap-x-8">
@@ -1542,35 +1565,6 @@ export default function RFQDetailClient() {
                                         />
                                         </div>
                                     </div>
-                                    )}
-                                    {/* Product Images Display */}
-                                    {product.images && product.images.length > 0 && (
-                                       <div className="mt-4 mb-6">
-                                        <span className="text-sm text-muted-foreground">{t('product_images')}:</span>
-                                        <div className="grid grid-cols-4 gap-2 mt-2">
-                                            {product.images.map((imageUrl, index) => (
-                                                <div 
-                                                  key={index} 
-                                                  className="relative group cursor-pointer"
-                                                  onClick={() => {
-                                                    setSelectedImage(imageUrl);
-                                                    setIsImageModalOpen(true);
-                                                  }}
-                                                >
-                                                    <img 
-                                                        src={imageUrl} 
-                                                        alt={`Product ${index + 1}`}
-                                                        className="w-full h-24 object-cover rounded-lg border hover:opacity-75 transition-opacity"
-                                                    />
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <div className="bg-black/50 rounded-full p-2">
-                                                            <Eye className="h-4 w-4 text-white" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                        </div>
                                     )}
                                     
                                     <Separator />

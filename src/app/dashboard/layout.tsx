@@ -40,11 +40,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <SidebarProvider defaultOpen={true}>
       <Sidebar variant="inset" collapsible="icon">
         <SidebarHeader>
-          <div className="flex items-center gap-2 p-2">
-            <div className="bg-primary text-primary-foreground rounded-lg p-2 flex-shrink-0">
-                <Workflow className="h-6 w-6" />
+        <div className="flex items-center gap-2 p-2 overflow-hidden">
+          <div className="bg-primary text-primary-foreground rounded-lg p-2 flex-shrink-0">
+            <Workflow className="h-6 w-6" />
             </div>
-            <span className="text-lg font-semibold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+            <span className="text-lg font-semibold text-sidebar-foreground truncate group-data-[collapsible=icon]:hidden">
               QuoteFlow
             </span>
           </div>

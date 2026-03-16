@@ -173,9 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (userData && userData.status === 'Inactive') {
         console.log('Login blocked: User account is inactive');
-        // Sign out the user immediately
         await signOut(auth);
-        return false;
+        throw new Error('ACCOUNT_DISABLED');
     }
       
       if (!userData) {

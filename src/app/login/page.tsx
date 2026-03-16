@@ -40,32 +40,38 @@ export default function LoginPage() {
     try {
       console.log('Calling login function...');
       const success = await login(email, password);
-      console.log('Login result:', success);
-      
-      if (success) {
-        console.log('Success! Redirecting...');
-        toast({
-          title: "Login Successful",
-          description: "Welcome back!",
-        });
-        router.push('/dashboard');
-      } else {
-        console.log('Login returned false');
-        toast({
-          variant: "destructive",
-          title: "Login Failed",
-          description: "Invalid email or password. Please check your credentials.",
-        });
-      }
-    } catch (error: any) {
-      console.error('Caught error:', error);
-      toast({
-        variant: "destructive",
-        title: "Login Error",
-        description: error?.message || "An error occurred during login. Please try again.",
-      });
-    } finally {
-      setIsLoading(false);
+        console.log('Login result:', success);
+
+        if (success) {
+            console.log('Success! Redirecting...');
+            toast({
+                title: "Login Successful",
+                description: "Welcome back!",
+            });
+            router.push('/dashboard');
+        } else {
+            console.log('Login returned false');
+            toast({
+                variant: "destructive",
+                title: "Login Failed",
+                description: "Invalid email or password. Please check your credentials.",
+            });
+        }
+      } catch (error: any) {
+        console.error('Caught error:', error);
+        if (error?.message === 'ACCOUNT_DISABLED') {
+            toast({
+                variant: "destructive",
+                title: "账号已停用",
+                description: "该账号已经停用，请联系管理员！",
+            });
+        } else {
+            toast({
+                variant: "destructive",
+                title: "Login Failed",
+                description: "Invalid email or password. Please check your credentials.",
+            });
+        }
     }
 };
 
