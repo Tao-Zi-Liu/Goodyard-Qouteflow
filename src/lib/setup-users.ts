@@ -24,7 +24,6 @@ export async function createUserProfile(
       email,
       ...profile,
     });
-    console.log('User profile created successfully for:', email);
   } catch (error) {
     console.error('Error creating user profile:', error);
   }

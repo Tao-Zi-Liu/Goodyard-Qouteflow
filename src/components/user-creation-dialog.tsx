@@ -119,8 +119,6 @@ export function UserCreationDialog({
   };
 
   const onSubmit = async (data: UserFormValues) => {
-     console.log('🚀 USER CREATION STARTED!'); // Add this line first
-  console.log('📧 Form data:', data); // Add this line too
     // Only admin users can create accounts
     if (currentUser?.role !== 'Admin') {
       toast({
@@ -134,13 +132,8 @@ export function UserCreationDialog({
     setIsLoading(true);
     
     try {
-      console.log('🚀 Starting user creation process...');
-      console.log('📧 Email:', data.email);
-      console.log('👤 Name:', data.name);
-      console.log('🎭 Role:', data.role);
 
       // Step 1: Create user in Firebase Authentication
-      console.log('📝 Creating user in Firebase Authentication...');
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         data.email,
@@ -148,17 +141,13 @@ export function UserCreationDialog({
       );
 
       const newUser = userCredential.user;
-      console.log('✅ User created in Authentication with UID:', newUser.uid);
 
       // Step 2: Update the user's display name
-      console.log('🏷️ Updating user display name...');
       await updateProfile(newUser, {
         displayName: data.name
       });
-      console.log('✅ Display name updated');
 
       // Step 3: Create user profile document in Firestore
-      console.log('💾 Creating user profile in Firestore...');
       const userDocRef = doc(db, 'users', newUser.uid);
       const userProfile = {
         id: newUser.uid,
@@ -175,12 +164,9 @@ export function UserCreationDialog({
       };
 
       await setDoc(userDocRef, userProfile);
-      console.log('✅ User profile created in Firestore');
 
       // Step 4: Sign out the newly created user to prevent admin logout
-      console.log('🚪 Signing out new user...');
       await signOut(auth);
-      console.log('✅ New user signed out');
 
       // Step 5: Show success with credentials
       setCreatedCredentials({

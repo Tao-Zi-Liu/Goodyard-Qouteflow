@@ -37,7 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = userDoc.data();
 
         if (userData.status === 'Inactive') {
-          console.log('User account is inactive, denying access');
           return null;
       }
         return {
@@ -86,7 +85,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsubscribe = onAuthStateChanged(
         auth, 
         async (firebaseUser) => {
-          console.log('Auth state changed:', firebaseUser?.email || 'null');
           
           try {
             if (firebaseUser) {
@@ -100,7 +98,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
               } else {
                 // Create user document if it doesn't exist
-                console.log('Creating user document for authenticated user');
                 const newUserData = {
                   email: firebaseUser.email,
                   name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
@@ -162,24 +159,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    console.log('Attempting login for:', email);
     setLoading(true);
     
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('Firebase auth successful for:', userCredential.user.email);
       
       const userData = await getUserData(userCredential.user);
 
       if (userData && userData.status === 'Inactive') {
-        console.log('Login blocked: User account is inactive');
         await signOut(auth);
         throw new Error('ACCOUNT_DISABLED');
     }
       
       if (!userData) {
         // Create user document if it doesn't exist
-        console.log('Creating user document for:', userCredential.user.email);
         const newUserData = {
           email: userCredential.user.email,
           name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || 'User',

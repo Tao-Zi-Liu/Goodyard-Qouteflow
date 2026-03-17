@@ -21,7 +21,7 @@ export interface User {
 }
 
 export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed'| 'Sent'   | 'Abandoned' | 'Closed' | 'Archived' | 'Canceled';
-export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee';
+export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee' | 'Hair Patch';
 
 export interface Product {
   id: string;

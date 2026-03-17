@@ -37,7 +37,7 @@ import { TranslateButton } from '@/components/translate-button';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
-const productSeriesOptions: ProductSeries[] = ['Wig', 'Hair Extension', 'Topper', 'Toupee', 'Synthetic Product'];
+const productSeriesOptions: ProductSeries[] = ['Wig', 'Topper', 'Hair Patch'];
 
 const wlidPrefixMap: Record<ProductSeries, string> = {
     'Wig': 'FTCV',
@@ -45,6 +45,7 @@ const wlidPrefixMap: Record<ProductSeries, string> = {
     'Topper': 'FTCP',
     'Toupee': 'FTCU',
     'Synthetic Product': 'FTCS',
+    'Hair Patch': 'FTCP',
 };
 
 const generateWlid = async (productSeries: ProductSeries): Promise<string> => {
@@ -129,7 +130,6 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
   // Add this useEffect to sync the watched files
   useEffect(() => {
       if (imageFiles && imageFiles.length > 0) {
-          console.log('👀 Watched imageFiles changed:', imageFiles.length);
       }
   }, [imageFiles]);    
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -191,8 +191,6 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
         // Store files in form data for later upload
         const newFiles = [...selectedImages, ...files];
         setValue(`products.${index}.imageFiles`, newFiles, { shouldValidate: true, shouldDirty: true });
-        console.log('💾 Saved image files:', newFiles);
-        console.log('📝 Form field updated:', `products.${index}.imageFiles`);
     };
   */
     const removeImage = (imageIndex: number) => {
@@ -207,7 +205,7 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
+                className="absolute top-2 right-2 text-muted-foreground hover:text-destructive hidden"
                 onClick={() => remove(index)}
             >
                 <Trash2 className="h-4 w-4" />
@@ -215,7 +213,7 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
             <div className="grid sm:grid-cols-1 gap-4">
                 <FormField control={control} name={`products.${index}.productSeries`} render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Product Series</FormLabel>
+                    <FormLabel>{t('field_product_series_label')}</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
@@ -229,7 +227,7 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
             <div className="grid sm:grid-cols-2 gap-4">
                 <FormField control={control} name={`products.${index}.wlid`} render={({ field }) => (
                   <FormItem>
-                    <FormLabel>WLID</FormLabel>
+                    <FormLabel>{t('field_wlid')}</FormLabel>
                     <FormControl>
                       <Input {...field} readOnly className="bg-muted/50" />
                     </FormControl>
@@ -237,7 +235,8 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
                   </FormItem>
                 )} />
                 <FormField control={control} name={`products.${index}.sku`} render={({ field }) => (
-                  <FormItem><FormLabel>SKU</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel><span className="text-red-500 mr-1">*</span>SKU</FormLabel>
+                  <FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
@@ -270,6 +269,7 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel htmlFor={`product-${index}-${fieldConfig.name}`}>
+                          {fieldConfig.required && <span className="text-red-500 mr-1">*</span>}
                           {t(fieldConfig.label)}
                         </FormLabel>
                         <FormControl>
@@ -362,7 +362,6 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
                               
                               // Update the form field
                               field.onChange(newFiles);
-                              console.log('💾 Form field updated with files:', newFiles);
                               
                               // Store in separate state
                               updateProductImages(productId, newFiles);
@@ -537,7 +536,6 @@ export default function NewRfqPage() {
       ...prev,
       [productId]: files
     }));
-    console.log('📦 Stored images for product:', productId, 'Files:', files.length);
   };
 
   const defaultProductSeries: ProductSeries = 'Wig';
@@ -565,6 +563,11 @@ export default function NewRfqPage() {
       density: '',
       color: '',
       curlStyle: '',
+      hairTexture: '',
+      hairPart: '',
+      layers: '',
+      hairBangs: '',
+      specialNotes: '',
       quantity: 1,
       images: [],
     }],
@@ -578,7 +581,7 @@ export default function NewRfqPage() {
   useEffect(() => {
     const errors = form.formState.errors;
     if (Object.keys(errors).length > 0) {
-        console.log('Form validation errors:', errors);
+      console.error('Form validation errors:', errors);
     }
   }, [form.formState.errors]);
 
@@ -591,27 +594,18 @@ export default function NewRfqPage() {
 
   
   const onPreview = (data: RfqFormValues) => {
-    console.log('Form submitted successfully!');
-    console.log('Form validation passed');
-    console.log('Submitted data:', data);
     // Use the direct form values since they contain the correct data
     const currentFormData = form.getValues();
-    console.log('Current form data:', currentFormData);
 
     setFormData(currentFormData);
     setIsPreviewOpen(true);
   };
 
 const handleSave = async () => {
-  console.log('🔧 handleSave called');
-  console.log('🔧 formData exists:', !!formData);
-  console.log('🔧 user exists:', !!user);
-  console.log('🔧 formData:', formData);
   if (!formData || !user) return;
 
   setIsSaving(true);
   try {
-      console.log('🔧 Starting RFQ creation...');
       const newRfqCode = `RFQ-${String(rfqCount + 1).padStart(4, '0')}`;
       // Create RFQ document first to get the ID
       const newRfqData = {
@@ -633,18 +627,14 @@ const handleSave = async () => {
       // Upload images for each product using the direct form values
       const productsWithImages = await Promise.all(
         formData.products.map(async (product: any) => {
-            console.log('🖼️ Processing product:', product.id);
             
             // Get files from separate state instead of form
             const imageFiles = productImages[product.id] || [];
-            console.log('📁 Image files found:', imageFiles.length);
             
             let imageUrls: string[] = [];
             
             if (imageFiles.length > 0) {
-              console.log('⬆️ Starting upload for', imageFiles.length, 'files');
               imageUrls = await uploadImages(imageFiles, newRfqId, product.id);
-              console.log('✅ Upload result:', imageUrls);
           }
       const cleanProduct = {
         id: product.id,
@@ -753,7 +743,7 @@ const handleSave = async () => {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{t('create_new_rfq_title')}</h1>
-            <p className="text-muted-foreground">Fill in the details to create a new request for quotation.</p>
+            <p className="text-muted-foreground">{t('create_rfq_subtitle')}</p>
           </div>
         </div>
 
@@ -764,7 +754,7 @@ const handleSave = async () => {
                 <Card>
                   <CardHeader>
                     <div className="flex justify-between items-center">
-                        <CardTitle>Products</CardTitle>
+                        <CardTitle>{t('products_card_title')}</CardTitle>
                         <AiExtractDialog onApply={handleAiApply} />
                     </div>
                   </CardHeader>
@@ -782,7 +772,7 @@ const handleSave = async () => {
                         t={t}
                         />
                     ))}
-                    <Button type="button" variant="outline" onClick={addProduct}>
+                    <Button type="button" variant="outline" onClick={addProduct} className="hidden">
                       <Plus className="mr-2 h-4 w-4" /> Add Another Product
                     </Button>
                   </CardContent>
@@ -791,12 +781,12 @@ const handleSave = async () => {
               <div className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Customer Information</CardTitle>
+                    <CardTitle>{t('customer_information')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <FormField control={form.control} name="customerType" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Customer Type</FormLabel>
+                        <FormLabel><span className="text-red-500 mr-1">*</span>Customer Type</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                            <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                            <SelectContent>
@@ -808,13 +798,14 @@ const handleSave = async () => {
                       </FormItem>
                     )} />
                      <FormField control={form.control} name="customerEmail" render={({ field }) => (
-                      <FormItem><FormLabel>Customer Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel><span className="text-red-500 mr-1">*</span>Customer Email</FormLabel>
+                      <FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Assign Purchaser</CardTitle>
+                    <CardTitle>{t('assign_purchaser')}</CardTitle>
                   </CardHeader>
                    <CardContent>
                       {loadingUsers ? (
@@ -825,7 +816,7 @@ const handleSave = async () => {
                             name="assignedPurchaserIds"
                             render={() => (
                                 <FormItem>
-                                    <FormLabel>Select Purchasers</FormLabel>
+                                    <FormLabel><span className="text-red-500 mr-1">*</span>Select Purchasers</FormLabel>
                                     <div className="space-y-2">
                                         {purchasingUsers.map((pUser) => (
                                             <FormField
@@ -868,10 +859,7 @@ const handleSave = async () => {
               <Button 
                     type="submit" 
                     onClick={() => {
-                        console.log('Submit button clicked');
                         const errors = form.formState.errors;
-                        console.log('Current form errors:', errors);
-                        console.log('Form is valid:', form.formState.isValid);
                     }}
                 >Create RFQ</Button>
             </div>
@@ -880,7 +868,7 @@ const handleSave = async () => {
       </div>
 
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl overflow-hidden">
           <DialogHeader>
             <DialogTitle>RFQ Preview</DialogTitle>
             <DialogDescription>
@@ -935,7 +923,7 @@ const handleSave = async () => {
                          {product.specialNotes && (
                         <div className="col-span-2">
                           <span className="font-medium text-muted-foreground">Special Notes:</span>
-                          <p className="mt-1 text-sm whitespace-pre-wrap">{product.specialNotes}</p>
+                          <p className="mt-1 text-sm whitespace-pre-wrap break-all">{product.specialNotes}</p>
                         </div>
                       )}
                     </CardContent>

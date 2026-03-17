@@ -1,11 +1,15 @@
-
 "use client";
 
 import type { ReactNode } from 'react';
-import { createContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import type { AppNotification } from '@/lib/types';
 import { useI18n } from '@/hooks/use-i18n';
+import {
+  collection, addDoc, updateDoc, doc, query,
+  where, onSnapshot, serverTimestamp, writeBatch, getDocs
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface NotificationContextType {
   notifications: AppNotification[];
@@ -17,90 +21,116 @@ interface NotificationContextType {
 
 export const NotificationContext = createContext<NotificationContextType | null>(null);
 
-const NOTIFICATIONS_STORAGE_KEY = 'app-notifications';
-
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { t, isLoaded } = useI18n();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const prevNotifIds = useRef<Set<string>>(new Set());
 
-  // Load notifications from localStorage on mount
-  useEffect(() => {
-    try {
-      const storedNotifications = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
-      if (storedNotifications) {
-        setNotifications(JSON.parse(storedNotifications));
-      }
-    } catch (error) {
-      console.error("Failed to parse notifications from localStorage", error);
-    }
-  }, []);
-
-  // Save notifications to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
-  }, [notifications]);
-
+  // ── Request desktop notification permission ───────────────────────────────
   const requestPermission = useCallback(async () => {
-    if (!('Notification' in window)) {
-      console.log("This browser does not support desktop notification");
-      return;
-    }
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
     if (Notification.permission === 'default') {
       await Notification.requestPermission();
     }
   }, []);
 
-  useEffect(() => {
-    requestPermission();
-  }, [requestPermission]);
+  useEffect(() => { requestPermission(); }, [requestPermission]);
 
+  // ── Show desktop notification ─────────────────────────────────────────────
   const showDesktopNotification = useCallback((notification: AppNotification) => {
-    if (Notification.permission === 'granted') {
-       new Notification(t(notification.titleKey), {
-        body: t(notification.bodyKey, notification.bodyParams),
-        icon: '/favicon.ico', // Optional: add an icon
-      });
-    }
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    new Notification(t(notification.titleKey), {
+      body: t(notification.bodyKey, notification.bodyParams),
+      icon: '/favicon.ico',
+    });
   }, [t]);
 
-  const createNotification = useCallback((data: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => {
-    const newNotification: AppNotification = {
-      ...data,
-      id: `notif-${Date.now()}`,
-      createdAt: Date.now(),
-      read: false,
-    };
-    
-    setNotifications(prev => [newNotification, ...prev]);
+  // ── Listen to Firestore notifications for current user ───────────────────
+  useEffect(() => {
+    if (!user?.id || !db) return;
 
-    // Show desktop notification only if the recipient is the current user
-    if (user?.id === data.recipientId) {
-        // Wait for translation to be loaded
-        if(isLoaded) {
-            showDesktopNotification(newNotification);
-        } else {
-            // A simple retry mechanism if translations are not yet loaded
-            setTimeout(() => showDesktopNotification(newNotification), 500);
-        }
-    }
-  }, [showDesktopNotification, user, isLoaded]);
-
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
+    const q = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', user.id)
     );
-  };
 
-  const markAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  };
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs: AppNotification[] = snapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        createdAt: d.data().createdAt?.toMillis?.() || d.data().createdAt || Date.now(),
+      })) as AppNotification[];
 
-  const userNotifications = notifications.filter(n => n.recipientId === user?.id);
-  const unreadCount = userNotifications.filter(n => !n.read).length;
+      // Sort newest first
+      notifs.sort((a, b) => b.createdAt - a.createdAt);
+      setNotifications(notifs);
+
+      // Show desktop notification for newly arrived unread notifications
+      if (isLoaded) {
+        notifs.forEach(n => {
+          if (!n.read && !prevNotifIds.current.has(n.id)) {
+            showDesktopNotification(n);
+          }
+        });
+      }
+
+      // Update seen IDs
+      prevNotifIds.current = new Set(notifs.map(n => n.id));
+    });
+
+    return () => unsubscribe();
+  }, [user?.id, isLoaded, showDesktopNotification]);
+
+  // ── Create notification (writes to Firestore) ─────────────────────────────
+  const createNotification = useCallback(async (
+    data: Omit<AppNotification, 'id' | 'createdAt' | 'read'>
+  ) => {
+    if (!db) return;
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        ...data,
+        read: false,
+        createdAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
+  }, []);
+
+  // ── Mark single notification as read ─────────────────────────────────────
+  const markAsRead = useCallback(async (id: string) => {
+    if (!db) return;
+    try {
+      await updateDoc(doc(db, 'notifications', id), { read: true });
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  }, []);
+
+  // ── Mark all notifications as read ───────────────────────────────────────
+  const markAllAsRead = useCallback(async () => {
+    if (!db || !user?.id) return;
+    try {
+      const q = query(
+        collection(db, 'notifications'),
+        where('recipientId', '==', user.id),
+        where('read', '==', false)
+      );
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach(d => batch.update(d.ref, { read: true }));
+      await batch.commit();
+    } catch (error) {
+      console.error('Error marking all as read:', error);
+    }
+  }, [user?.id]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const value = {
-    notifications: userNotifications,
+    notifications,
     unreadCount,
     createNotification,
     markAsRead,

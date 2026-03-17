@@ -23,9 +23,6 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('=== Login Debug ===');
-    console.log('Email:', email);
-    console.log('Password length:', password.length);
     
     if (!email || !password) {
       toast({
@@ -38,19 +35,15 @@ export default function LoginPage() {
 
     setIsLoading(true);
     try {
-      console.log('Calling login function...');
       const success = await login(email, password);
-        console.log('Login result:', success);
 
         if (success) {
-            console.log('Success! Redirecting...');
             toast({
                 title: "Login Successful",
                 description: "Welcome back!",
             });
             router.push('/dashboard');
         } else {
-            console.log('Login returned false');
             toast({
                 variant: "destructive",
                 title: "Login Failed",

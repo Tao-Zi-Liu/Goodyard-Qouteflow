@@ -1,75 +1,53 @@
-
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { db } from '@/lib/firebase';
-import { ArrowLeft, Edit, CheckCircle, Clock, Send, XCircle, Eye, X, Upload, FileText, Lock, Unlock, History, Save } from 'lucide-react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { rfqFormSchema } from '@/lib/schemas';
+import { db, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
 import { serverTimestamp } from 'firebase/firestore';
+import { ArrowLeft, Edit, CheckCircle, Send, XCircle, Lock, Unlock, Save } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { rfqFormSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import { useI18n } from '@/hooks/use-i18n';
 import { useAuth } from '@/hooks/use-auth';
-import type { RFQ, Quote, RFQStatus, Product, User } from '@/lib/types';
-import { QuoteDialog } from '@/components/quote-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
-import { convertRMBToUSD, calculateCustomizedPrice, } from '@/lib/currency';
-import { AbandonQuoteDialog } from '@/components/abandon-quote-dialog';
-import { TranslateButton } from '@/components/translate-button';
+import { convertRMBToUSD, calculateCustomizedPrice } from '@/lib/currency';
 import { translateText } from '@/lib/translate';
-import { formatRMB, formatUSD } from '@/lib/currency';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+    AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import type { RFQ, Quote, RFQStatus, User } from '@/lib/types';
+import type { EditingImages, TranslatedFields } from './components/types';
 
+// Sub-components
+import { ImageModal } from './components/image-modal';
+import { ActionHistorySection } from './components/action-history';
+import { ProductView } from './components/product-view';
+import { ProductEditForm } from './components/product-edit-form';
+import { QuoteSection } from './components/quote-section';
+import { CustomerSidebar } from './components/customer-sidebar';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const formatFirestoreDate = (date: any): string => {
     if (!date) return 'N/A';
-    
-    // Handle Firestore timestamp
-    if (date.seconds) {
-        return new Date(date.seconds * 1000).toLocaleString();
-    }
-    
-    // Handle regular Date object or ISO string
-    if (date instanceof Date) {
-        return date.toLocaleString();
-    }
-    
-    // Handle ISO string
-    if (typeof date === 'string') {
-        return new Date(date).toLocaleString();
-    }
-    
+    if (date.seconds) return new Date(date.seconds * 1000).toLocaleString();
+    if (date instanceof Date) return date.toLocaleString();
+    if (typeof date === 'string') return new Date(date).toLocaleString();
     return 'N/A';
 };
 
-const isChineseText = (text: string): boolean => {
-    return /[\u4e00-\u9fff]/.test(text);
-  };
+const isChineseText = (text: string): boolean => /[\u4e00-\u9fff]/.test(text);
 
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function RFQDetailClient() {
     const params = useParams();
     const router = useRouter();
@@ -77,222 +55,123 @@ export default function RFQDetailClient() {
     const { user } = useAuth();
     const { toast } = useToast();
     const { createNotification } = useNotifications();
+
     const [rfq, setRfq] = useState<RFQ | null>(null);
     const [creator, setCreator] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<User[]>([]);
+    const [purchasingUsers, setPurchasingUsers] = useState<User[]>([]);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editFormData, setEditFormData] = useState<any>(null);
-    const [purchasingUsers, setPurchasingUsers] = useState<User[]>([]);
-    const [editingImages, setEditingImages] = useState<{[productIndex: number]: {existing: string[], new: File[]}}>({});
-    const [translatedFields, setTranslatedFields] = useState<{[productId: string]: {[fieldName: string]: string}}>({});
+    const [editingImages, setEditingImages] = useState<EditingImages>({});
+    const [translatedFields, setTranslatedFields] = useState<TranslatedFields>({});
 
     const editForm = useForm({
         resolver: zodResolver(rfqFormSchema),
-        defaultValues: {
-            customerType: '',
-            customerEmail: '',
-            assignedPurchaserIds: [],
-            products: []
-        }
-    });
-    
-    const { fields: editProductFields, append: addEditProduct, remove: removeEditProduct } = useFieldArray({
-        control: editForm.control,
-        name: 'products',
+        defaultValues: { customerType: '', customerEmail: '', assignedPurchaserIds: [], products: [] }
     });
 
+    // ── Fetch RFQ ─────────────────────────────────────────────────────────────
     useEffect(() => {
         const fetchRfq = async () => {
-            if (params.id) {
-                const docRef = doc(db, "rfqs", params.id as string);
-                const docSnap = await getDoc(docRef);
-    
-                if (docSnap.exists()) {
-                    const rfqData = { 
-                        id: docSnap.id, 
-                        ...docSnap.data(),
-                        quotes: docSnap.data().quotes || []
-                    } as RFQ;
-                    console.log('📸 RFQ Products with images:', rfqData.products.map(p => ({
-                        id: p.id,
-                        sku: p.sku,
-                        imageCount: p.images?.length || 0,
-                        images: p.images
-                    })));
-                    
-                    setRfq(rfqData);
-                    if (rfqData && !editFormData) {
-                        editForm.reset({
-                            customerType: rfqData.customerType,
-                            customerEmail: rfqData.customerEmail,
-                            assignedPurchaserIds: rfqData.assignedPurchaserIds,
-                            products: rfqData.products.map(product => ({
-                                ...product,
-                                imageFiles: []
-                            }))
-                        });
-                        
-                        // Initialize editing images state
-                        const initialImages = {};
-                        rfqData.products.forEach((product, index) => {
-                            initialImages[index] = {
-                                existing: product.images || [],
-                                new: []
-                            };
-                        });
-                        setEditingImages(initialImages);
-                    }    
-                    
-                    const { getDocs, collection } = await import('firebase/firestore');
-                    const usersSnapshot = await getDocs(collection(db, 'users'));
-                    const usersData = usersSnapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    })) as User[];
-                    setUsers(usersData);
+            if (!params.id) return;
+            const docRef = doc(db, "rfqs", params.id as string);
+            const docSnap = await getDoc(docRef);
 
-                    const activePurchasingUsers = usersData.filter(u => 
-                        u.role === 'Purchasing' && u.status === 'Active'
-                    );
-                    setPurchasingUsers(activePurchasingUsers);
-                    
-                    const foundCreator = usersData.find(u => u.id === rfqData.creatorId);
-                    setCreator(foundCreator || null);
-                } else {
-                    toast({
-                        variant: "destructive",
-                        title: "Not Found",
-                        description: "The requested RFQ could not be found.",
+            if (docSnap.exists()) {
+                const rfqData = { id: docSnap.id, ...docSnap.data(), quotes: docSnap.data().quotes || [] } as RFQ;
+                setRfq(rfqData);
+
+                if (!editFormData) {
+                    editForm.reset({
+                        customerType: rfqData.customerType,
+                        customerEmail: rfqData.customerEmail,
+                        assignedPurchaserIds: rfqData.assignedPurchaserIds,
+                        products: rfqData.products.map(p => ({ ...p, imageFiles: [] }))
                     });
-                    router.push('/dashboard');
+                    const initialImages: EditingImages = {};
+                    rfqData.products.forEach((p, i) => {
+                        initialImages[i] = { existing: p.images || [], new: [] };
+                    });
+                    setEditingImages(initialImages);
                 }
+
+                const { getDocs, collection } = await import('firebase/firestore');
+                const usersSnap = await getDocs(collection(db, 'users'));
+                const usersData = usersSnap.docs.map(d => ({ id: d.id, ...d.data() })) as User[];
+                setUsers(usersData);
+                setPurchasingUsers(usersData.filter(u => u.role === 'Purchasing' && u.status === 'Active'));
+                setCreator(usersData.find(u => u.id === rfqData.creatorId) || null);
+            } else {
+                toast({ variant: "destructive", title: "Not Found", description: "The requested RFQ could not be found." });
+                router.push('/dashboard');
             }
             setLoading(false);
         };
-    
         fetchRfq();
     }, [params.id, router, toast]);
 
+    // ── Auto-translate on language change ─────────────────────────────────────
     useEffect(() => {
-        if (rfq && language === 'zh') {
-          // Auto-translate all product parameters to Chinese
-          rfq.products.forEach(product => {
-            ['hairFiber', 'cap', 'capSize', 'length', 'density', 'color', 'curlStyle', 'specialNotes'].forEach(field => {
-              if (product[field] && !isChineseText(product[field])) {
-                translateText(product[field], 'zh').then(result => {
-                  setTranslatedFields(prev => ({
-                    ...prev,
-                    [product.id]: {
-                      ...prev[product.id],
-                      [field]: result.translatedText
-                    }
-                  }));
-                }).catch(error => {
-                  console.error('Auto-translation failed:', error);
-                });
-              }
+        if (!rfq || language !== 'zh') return;
+        rfq.products.forEach(product => {
+            const allFieldNames = Object.keys(product).filter(k =>
+                typeof (product as any)[k] === 'string' && !['id', 'wlid', 'sku', 'productSeries', 'imageFiles'].includes(k)
+            );
+            allFieldNames.forEach(field => {
+                const value = (product as any)[field];
+                if (value && !isChineseText(value)) {
+                    translateText(value, 'zh').then(result => {
+                        setTranslatedFields(prev => ({
+                            ...prev,
+                            [product.id]: { ...prev[product.id], [field]: result.translatedText }
+                        }));
+                    }).catch(() => {});
+                }
             });
-          });
-        }
-      }, [rfq, language]);
+        });
+    }, [rfq, language]);
 
-    const getPurchaser = (purchaserId: string) => users.find(u => u.id === purchaserId);
-
-    const getStatusVariant = (status: RFQStatus) => {
-        switch (status) {
-            case 'Waiting for Quote': return 'secondary';
-            case 'Locked': return 'destructive';
-            case 'Quotation in Progress': return 'default';
-            case 'Quotation Completed': return 'outline';
-            case 'Sent': return 'default';
-            case 'Canceled':
-            case 'Archived': 
-            case 'Abandoned':
-                return 'destructive';
-            default: return 'secondary';
-        }
-    };
-
+    // ── Action History ────────────────────────────────────────────────────────
     const addActionHistory = async (rfqId: string, actionType: string, details?: any) => {
-        if (!user) return;
-        
-        try {
-            const rfqRef = doc(db, "rfqs", rfqId);
-            
-            const newAction = {
-                id: `action-${Date.now()}`,
-                rfqId,
-                actionType,
-                performedBy: user.id,
-                performedByName: user.name,
-                timestamp: new Date().toISOString(),
-                details: details || {}
-            };
-    
-            const updatedHistory = [...(rfq?.actionHistory || []), newAction];
-    
-            await updateDoc(rfqRef, {
-                actionHistory: updatedHistory
-            });
-    
-            // Update local state
-            if (rfq) {
-                setRfq({ ...rfq, actionHistory: updatedHistory });
-            }
-        } catch (error) {
-            console.error('Error adding action history:', error);
-        }
+        if (!user || !rfq) return;
+        const newAction = {
+            id: `action-${Date.now()}`, rfqId, actionType,
+            performedBy: user.id, performedByName: user.name,
+            timestamp: new Date().toISOString(), details: details || {}
+        };
+        const updatedHistory = [...(rfq.actionHistory || []), newAction];
+        await updateDoc(doc(db, "rfqs", rfqId), { actionHistory: updatedHistory });
+        setRfq(prev => prev ? { ...prev, actionHistory: updatedHistory } : null);
     };
 
+    // ── Handlers ──────────────────────────────────────────────────────────────
     const handleAcceptQuote = async (productId: string, purchaserId: string) => {
         if (!rfq || !user || user.role !== 'Sales') return;
-    
         try {
             const acceptedQuote = rfq.quotes.find(q => q.productId === productId && q.purchaserId === purchaserId);
             if (!acceptedQuote) throw new Error("Quote not found");
-    
+
             const updatedQuotes = rfq.quotes.map(q => {
                 if (q.productId === productId) {
-                    return q.purchaserId === purchaserId
-                        ? { ...q, status: 'Accepted' as const }
-                        : { ...q, status: 'Rejected' as const };
+                    return q.purchaserId === purchaserId ? { ...q, status: 'Accepted' as const } : { ...q, status: 'Rejected' as const };
                 }
                 return q;
             });
-    
-            const allProductsQuoted = rfq.products.every(p =>
-                updatedQuotes.some(q => q.productId === p.id && q.status === 'Accepted')
-            );
-            const newStatus = allProductsQuoted ? 'Quotation Completed' : rfq.status;
-    
-            const updatedRfqData = {
-                quotes: updatedQuotes,
-                status: newStatus,
-                lastUpdatedTime: serverTimestamp(),
-            };
-    
-            const docRef = doc(db, "rfqs", rfq.id);
-            await updateDoc(docRef, updatedRfqData);
-    
-            const updatedRfq = { ...rfq, ...updatedRfqData, status: newStatus };
-            setRfq(updatedRfq);
-    
-            await addActionHistory(
-                rfq.id,
-                'quote_accepted',
-                {
-                    productId,
-                    quotePurchaserId: purchaserId,
-                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
-                    quotePrice: acceptedQuote.price,
-                    previousStatus: rfq.status,
-                    newStatus: newStatus
-                }
-            );
-    
+            const allAccepted = rfq.products.every(p => updatedQuotes.some(q => q.productId === p.id && q.status === 'Accepted'));
+            const newStatus = allAccepted ? 'Quotation Completed' : rfq.status;
+
+            await updateDoc(doc(db, "rfqs", rfq.id), { quotes: updatedQuotes, status: newStatus, lastUpdatedTime: serverTimestamp() });
+            setRfq(prev => prev ? { ...prev, quotes: updatedQuotes, status: newStatus } : null);
+
+            await addActionHistory(rfq.id, 'quote_accepted', {
+                productId, purchaserId,
+                productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                previousStatus: rfq.status, newStatus
+            });
+
             createNotification({
                 recipientId: acceptedQuote.purchaserId,
                 titleKey: 'notification_quote_accepted_title',
@@ -301,12 +180,11 @@ export default function RFQDetailClient() {
                 href: `/dashboard/rfq/${rfq.id}`,
             });
 
-            // If the RFQ is now complete, notify all Sales users that it's ready to be sent
             if (newStatus === 'Quotation Completed') {
                 const salesUsers = users.filter(u => u.role === 'Sales' && u.status === 'Active');
-                for (const salesUser of salesUsers) {
+                for (const su of salesUsers) {
                     createNotification({
-                        recipientId: salesUser.id,
+                        recipientId: su.id,
                         titleKey: 'notification_rfq_ready_to_send_title',
                         bodyKey: 'notification_rfq_ready_to_send_body',
                         bodyParams: { rfqCode: rfq.rfqCode || rfq.code || rfq.id },
@@ -314,13 +192,9 @@ export default function RFQDetailClient() {
                     });
                 }
             }
-    
-            toast({
-                title: "Quote Accepted",
-                description: "The quote has been accepted.",
-            });
+
+            toast({ title: "Quote Accepted", description: "The quote has been accepted." });
         } catch (error) {
-            console.error("Error accepting quote: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to accept the quote.' });
         }
     };
@@ -328,138 +202,56 @@ export default function RFQDetailClient() {
     const handleLockToggle = async () => {
         if (!rfq || !user || user.role !== 'Purchasing') return;
         if (!rfq.assignedPurchaserIds.includes(user.id)) return;
-    
         try {
-            const isCurrentlyLocked = rfq.status === 'Locked';
-            
-            const updates: any = {
-                status: isCurrentlyLocked ? 'Waiting for Quote' : 'Locked',
-                updatedAt: serverTimestamp()
-            };
-    
-            if (!isCurrentlyLocked) {
-                // Locking the RFQ
-                updates.lockedBy = user.id;
-                updates.lockedAt = serverTimestamp();
-            } else {
-                // Unlocking the RFQ
-                updates.lockedBy = null;
-                updates.lockedAt = null;
-            }
-    
-            const docRef = doc(db, "rfqs", rfq.id);
-            await updateDoc(docRef, updates);
-    
-            // Update local state
-            setRfq(prev => prev ? {
-                ...prev,
-                status: isCurrentlyLocked ? 'Waiting for Quote' : 'Locked',
-                lockedBy: isCurrentlyLocked ? undefined : user.id,
-                lockedAt: isCurrentlyLocked ? undefined : new Date().toISOString()
-            } : null);
-    
-            // Add to action history
-            await addActionHistory(
-                rfq.id, 
-                isCurrentlyLocked ? 'rfq_unlocked' : 'rfq_locked',
-                {
-                    previousStatus: rfq.status,
-                    newStatus: isCurrentlyLocked ? 'Waiting for Quote' : 'Locked'
-                }
-            );
-    
-            toast({
-                title: isCurrentlyLocked ? "RFQ Unlocked" : "RFQ Locked",
-                description: `RFQ ${rfq.rfqCode || rfq.code} has been ${isCurrentlyLocked ? 'unlocked' : 'locked'}.`,
-            });
-    
-        } catch (error) {
-            console.error('Error toggling lock:', error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to update RFQ status. Please try again.",
-            });
+            const locked = rfq.status === 'Locked';
+            const updates: any = { status: locked ? 'Waiting for Quote' : 'Locked', updatedAt: serverTimestamp() };
+            if (!locked) { updates.lockedBy = user.id; updates.lockedAt = serverTimestamp(); }
+            else { updates.lockedBy = null; updates.lockedAt = null; }
+            await updateDoc(doc(db, "rfqs", rfq.id), updates);
+            setRfq(prev => prev ? { ...prev, status: locked ? 'Waiting for Quote' : 'Locked', lockedBy: locked ? undefined : user.id } : null);
+            await addActionHistory(rfq.id, locked ? 'rfq_unlocked' : 'rfq_locked', { previousStatus: rfq.status, newStatus: locked ? 'Waiting for Quote' : 'Locked' });
+            toast({ title: locked ? t('button_unlock_rfq') : t('button_lock_rfq') });
+        } catch {
+            toast({ variant: "destructive", title: "Error", description: "Failed to update RFQ status." });
         }
-    };    
+    };
 
     const handleQuoteSubmit = async (productId: string, price: number, deliveryDate: Date, message: string, existingQuote?: Quote) => {
         if (!rfq || !user) return;
         try {
-            let updatedQuotes: Quote[];
             const isUpdate = !!existingQuote;
-            const salesCostPriceRMB = price; // Original RMB input
-            const salesCostPriceUSD = convertRMBToUSD(price); // RMB ÷ 7.25
-            const customizedProductPriceUSD = calculateCustomizedPrice(price); // (RMB ÷ 2.7 + 40) × 1.075
+            const salesCostPriceRMB = price;
+            const salesCostPriceUSD = convertRMBToUSD(price);
+            const customizedProductPriceUSD = calculateCustomizedPrice(price);
 
-
+            let updatedQuotes: Quote[];
             if (isUpdate) {
                 updatedQuotes = rfq.quotes.map(q =>
                     q.productId === productId && q.purchaserId === user.id
-                    ? { 
-                        ...q, 
-                        salesCostPriceRMB,
-                        salesCostPriceUSD,
-                        customizedProductPriceUSD,
-                        // Keep backward compatibility
-                        price: salesCostPriceRMB,
-                        priceUSD: salesCostPriceUSD,
-                        deliveryDate: deliveryDate.toISOString(), 
-                        quoteTime: new Date().toISOString(), 
-                        notes: message 
-                    }
-                    : q
+                        ? { ...q, salesCostPriceRMB, salesCostPriceUSD, customizedProductPriceUSD, price: salesCostPriceRMB, priceUSD: salesCostPriceUSD, deliveryDate: deliveryDate.toISOString(), quoteTime: new Date().toISOString(), notes: message }
+                        : q
                 );
             } else {
                 const newQuote: Quote = {
-                    id: `quote-${Date.now()}`,
-                    rfqId: rfq.id,
-                    productId,
-                    purchaserId: user.id,
-                    salesCostPriceRMB,
-                    salesCostPriceUSD,
-                    customizedProductPriceUSD,
-                    // Keep backward compatibility
-                    price: salesCostPriceRMB,
-                    priceUSD: salesCostPriceUSD,
-                    deliveryDate: deliveryDate.toISOString(),
-                    quoteTime: new Date().toISOString(),
-                    status: 'Pending Acceptance',
-                    notes: message
+                    id: `quote-${Date.now()}`, rfqId: rfq.id, productId, purchaserId: user.id,
+                    salesCostPriceRMB, salesCostPriceUSD, customizedProductPriceUSD,
+                    price: salesCostPriceRMB, priceUSD: salesCostPriceUSD,
+                    deliveryDate: deliveryDate.toISOString(), quoteTime: new Date().toISOString(),
+                    status: 'Pending Acceptance', notes: message
                 };
                 updatedQuotes = [...rfq.quotes, newQuote];
             }
 
-            const updatedRfqData: any = {
-                quotes: updatedQuotes,
-                status: 'Quotation in Progress' as RFQStatus,
-                lastUpdatedTime: serverTimestamp(),
-            };
-    
-            // Auto-unlock when quote is submitted
-            if (rfq.status === 'Locked' && rfq.lockedBy === user.id) {
-                updatedRfqData.lockedBy = null;
-                updatedRfqData.lockedAt = null;
-            }
+            const updatedData: any = { quotes: updatedQuotes, status: 'Quotation in Progress' as RFQStatus, lastUpdatedTime: serverTimestamp() };
+            if (rfq.status === 'Locked' && rfq.lockedBy === user.id) { updatedData.lockedBy = null; updatedData.lockedAt = null; }
 
-            const docRef = doc(db, "rfqs", rfq.id);
-            await updateDoc(docRef, updatedRfqData);
+            await updateDoc(doc(db, "rfqs", rfq.id), updatedData);
+            setRfq(prev => prev ? { ...prev, ...updatedData, status: 'Quotation in Progress' as RFQStatus } : null);
 
-            const updatedRfq = { ...rfq, ...updatedRfqData, status: 'Quotation in Progress' as RFQStatus };
-            setRfq(updatedRfq);
-
-            await addActionHistory(
-                rfq.id,
-                isUpdate ? 'quote_updated' : 'quote_submitted',
-                {
-                    productId,
-                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
-                    quotePrice: price,
-                    deliveryDate: deliveryDate.toISOString(),
-                    previousStatus: rfq.status,
-                    newStatus: 'Quotation in Progress'
-                }
-            );
+            await addActionHistory(rfq.id, isUpdate ? 'quote_updated' : 'quote_submitted', {
+                productId, productName: rfq.products.find(p => p.id === productId)?.sku || '',
+                quotePrice: price, previousStatus: rfq.status, newStatus: 'Quotation in Progress'
+            });
 
             createNotification({
                 recipientId: rfq.creatorId,
@@ -469,69 +261,28 @@ export default function RFQDetailClient() {
                 href: `/dashboard/rfq/${rfq.id}`,
             });
 
-            toast({
-                title: isUpdate ? "Quote Updated" : "Quote Submitted",
-                description: `Your quote for product ${rfq.products.find(p => p.id === productId)?.sku} has been saved.`,
-            });
-        } catch (error) {
-            console.error("Error submitting quote: ", error);
+            toast({ title: isUpdate ? "Quote Updated" : "Quote Submitted" });
+        } catch {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the quote.' });
         }
     };
 
     const handleAbandonQuote = async (productId: string, reason: string) => {
         if (!rfq || !user) return;
-        
         try {
             const abandonedQuote: Quote = {
-                id: `quote-${Date.now()}`,
-                rfqId: rfq.id,
-                productId,
-                purchaserId: user.id,
-                quoteTime: new Date().toISOString(),
-                status: 'Abandoned',
-                abandonmentReason: reason,
-                abandonedAt: new Date().toISOString()
+                id: `quote-${Date.now()}`, rfqId: rfq.id, productId, purchaserId: user.id,
+                quoteTime: new Date().toISOString(), status: 'Abandoned',
+                abandonmentReason: reason, abandonedAt: new Date().toISOString()
             };
-    
             const updatedQuotes = [...rfq.quotes.filter(q => !(q.productId === productId && q.purchaserId === user.id)), abandonedQuote];
-    
-            // Check if all assigned purchasers have abandoned all products
-            const allProductsAbandoned = rfq.products.every(product => {
-                return rfq.assignedPurchaserIds.every(purchaserId => {
-                    const purchaserQuote = updatedQuotes.find(q => 
-                        q.productId === product.id && q.purchaserId === purchaserId
-                    );
-                    return purchaserQuote?.status === 'Abandoned';
-                });
-            });
-    
-            const newStatus = allProductsAbandoned ? 'Abandoned' : rfq.status;
-    
-            const updatedRfqData = {
-                quotes: updatedQuotes,
-                status: newStatus,
-                lastUpdatedTime: serverTimestamp(),
-            };
-    
-            const docRef = doc(db, "rfqs", rfq.id);
-            await updateDoc(docRef, updatedRfqData);
-    
-            const updatedRfq = { ...rfq, ...updatedRfqData, status: newStatus };
-            setRfq(updatedRfq);
-    
-            await addActionHistory(
-                rfq.id,
-                'quote_abandoned',
-                {
-                    productId,
-                    productName: rfq.products.find(p => p.id === productId)?.sku || '',
-                    abandonmentReason: reason,
-                    previousStatus: rfq.status,
-                    newStatus: newStatus
-                }
+            const allAbandoned = rfq.products.every(p =>
+                rfq.assignedPurchaserIds.every(pId => updatedQuotes.find(q => q.productId === p.id && q.purchaserId === pId)?.status === 'Abandoned')
             );
-    
+            const newStatus = allAbandoned ? 'Abandoned' : rfq.status;
+            await updateDoc(doc(db, "rfqs", rfq.id), { quotes: updatedQuotes, status: newStatus, lastUpdatedTime: serverTimestamp() });
+            setRfq(prev => prev ? { ...prev, quotes: updatedQuotes, status: newStatus } : null);
+            await addActionHistory(rfq.id, 'quote_abandoned', { productId, abandonmentReason: reason, previousStatus: rfq.status, newStatus });
             createNotification({
                 recipientId: rfq.creatorId,
                 titleKey: 'notification_quote_abandoned_title',
@@ -539,90 +290,41 @@ export default function RFQDetailClient() {
                 bodyParams: { purchaserName: user.name, rfqCode: rfq.rfqCode || rfq.code },
                 href: `/dashboard/rfq/${rfq.id}`,
             });
-    
-            toast({
-                title: t('quote_abandoned'),
-                description: t('quote_abandoned_description'),
-            });
-        } catch (error) {
-            console.error("Error abandoning quote: ", error);
-            toast({ 
-                variant: 'destructive', 
-                title: 'Error', 
-                description: 'Failed to abandon the quote.' 
-            });
+            toast({ title: t('quote_abandoned'), description: t('quote_abandoned_description') });
+        } catch {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to abandon the quote.' });
         }
     };
-    
+
     const handleSaveRfq = async () => {
-        console.log('🔧 handleSaveRfq called');
-        console.log('🔧 rfq exists:', !!rfq);
-        console.log('🔧 user exists:', !!user);
-        
-        if (!rfq || !user) {
-            console.log('❌ Missing rfq or user');
-            return;
-        }
-    
+        if (!rfq || !user) return;
         try {
-            console.log('🔧 Getting form values...');
             const formData = editForm.getValues();
-            console.log('🔧 Form data:', formData);
-            
-            console.log('🔧 Triggering validation...');
             const isValid = await editForm.trigger();
-            console.log('🔧 Form is valid:', isValid);
-            
             if (!isValid) {
-                console.log('❌ Form validation failed');
-                toast({
-                    variant: "destructive",
-                    title: "Validation Error",
-                    description: "Please check all required fields.",
-                });
+                toast({ variant: "destructive", title: "Validation Error", description: "Please check all required fields." });
                 return;
             }
-            console.log('🔧 Starting image processing...');
-    
-            // Process images for each product
+
             const updatedProducts = await Promise.all(
-                formData.products.map(async (product, productIndex) => {
-                    console.log(`🔧 Processing product ${productIndex}:`, product.id);
+                formData.products.map(async (product: any, productIndex: number) => {
                     const imageState = editingImages[productIndex] || { existing: [], new: [] };
-                    
-                    // Upload new images
                     let newImageUrls: string[] = [];
                     if (imageState.new.length > 0) {
-                        console.log(`🔧 Uploading ${imageState.new.length} new images...`);
-                        const uploadPromises = imageState.new.map(async (file, index) => {
+                        const uploads = imageState.new.map(async (file, i) => {
                             try {
-                                const fileName = `rfqs/${rfq.id}/${product.id}/${Date.now()}_${index}_${file.name}`;
-                                const storageRef = ref(storage, fileName);
-                                const snapshot = await uploadBytes(storageRef, file);
-                                const downloadURL = await getDownloadURL(snapshot.ref);
-                                return downloadURL;
-                            } catch (error) {
-                                console.error('Error uploading image:', error);
-                                return null;
-                            }
+                                const storageRef = ref(storage, `rfqs/${rfq.id}/${product.id}/${Date.now()}_${i}_${file.name}`);
+                                const snap = await uploadBytes(storageRef, file);
+                                return await getDownloadURL(snap.ref);
+                            } catch { return null; }
                         });
-    
-                        const results = await Promise.all(uploadPromises);
-                        newImageUrls = results.filter((url): url is string => url !== null);
+                        newImageUrls = (await Promise.all(uploads)).filter((u): u is string => u !== null);
                     }
-                    
-                    // Combine existing images (that weren't deleted) with new uploaded images
-                    const finalImages = [...imageState.existing, ...newImageUrls];
-                    
-                    return {
-                        ...product,
-                        images: finalImages
-                    };
+                    return { ...product, images: [...imageState.existing, ...newImageUrls] };
                 })
             );
-            
-            console.log('🔧 Preparing RFQ update data...');
-            const updatedRfqData = {
+
+            const updatedData = {
                 customerType: formData.customerType,
                 customerEmail: formData.customerEmail,
                 assignedPurchaserIds: formData.assignedPurchaserIds,
@@ -632,324 +334,134 @@ export default function RFQDetailClient() {
                 lastUpdatedTime: serverTimestamp(),
             };
 
-            console.log('🔧 Updating Firestore document...');
-            const docRef = doc(db, "rfqs", rfq.id);
-            await updateDoc(docRef, updatedRfqData);
-            
-            console.log('🔧 Update successful, updating local state...');
-            const updatedRfq = { ...rfq, ...updatedRfqData };
-            setRfq(updatedRfq);
+            await updateDoc(doc(db, "rfqs", rfq.id), updatedData);
+            setRfq(prev => prev ? { ...prev, ...updatedData } : null);
             setIsEditing(false);
-            setEditingImages({}); // Clear editing images state
+            setEditingImages({});
 
-            console.log('🔧 Adding action history...');
-            await addActionHistory(
-                rfq.id,
-                'rfq_edited',
-                {
-                    customerEmail: formData.customerEmail,
-                    customerType: formData.customerType,
-                    productCount: formData.products.length,
-                    assignedPurchasers: formData.assignedPurchaserIds.length
-                }
-            );
-
-            console.log('🔧 Showing success toast...');
-            toast({
-                title: "RFQ Updated",
-                description: "The RFQ has been successfully updated.",
+            await addActionHistory(rfq.id, 'rfq_edited', {
+                customerEmail: formData.customerEmail,
+                customerType: formData.customerType,
             });
-    
-        } catch (error) {
-            console.error('❌ Error in handleSaveRfq:', error);
-            console.error("Error updating RFQ:", error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to update the RFQ. Please try again.",
-            });
+            toast({ title: "RFQ Updated", description: "The RFQ has been successfully updated." });
+        } catch {
+            toast({ variant: "destructive", title: "Error", description: "Failed to update the RFQ. Please try again." });
         }
     };
 
     const handleMarkAsSent = async () => {
         if (!rfq || !user || user.role !== 'Sales') return;
-    
         try {
-            const docRef = doc(db, "rfqs", rfq.id);
-            await updateDoc(docRef, {
-                status: 'Sent' as RFQStatus,
-                sentAt: serverTimestamp(),
-                sentBy: user.id,
-                lastUpdatedTime: serverTimestamp(),
-            });
-    
+            await updateDoc(doc(db, "rfqs", rfq.id), { status: 'Sent' as RFQStatus, sentAt: serverTimestamp(), sentBy: user.id, lastUpdatedTime: serverTimestamp() });
             setRfq(prev => prev ? { ...prev, status: 'Sent' } : null);
-    
-            await addActionHistory(
-                rfq.id,
-                'rfq_sent',
-                {
-                    previousStatus: rfq.status,
-                    newStatus: 'Sent'
-                }
-            );
-    
-            toast({
-                title: t('rfq_sent_title'),
-                description: t('rfq_sent_description'),
-            });
-    
-        } catch (error) {
-            console.error('Error marking RFQ as sent:', error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to mark RFQ as sent. Please try again.",
-            });
+            await addActionHistory(rfq.id, 'rfq_sent', { previousStatus: rfq.status, newStatus: 'Sent' });
+            toast({ title: t('rfq_sent_title'), description: t('rfq_sent_description') });
+        } catch {
+            toast({ variant: "destructive", title: "Error", description: "Failed to mark RFQ as sent." });
         }
     };
 
     const handleCancelRfq = async () => {
         if (!rfq || !user) return;
         if (user.id !== rfq.creatorId && user.role !== 'Admin') return;
-    
         try {
-          const docRef = doc(db, "rfqs", rfq.id);
-          const previousStatus = rfq.status;
-          const newStatus = 'Canceled' as RFQStatus;
-    
-          await updateDoc(docRef, {
-            status: newStatus,
-            lastUpdatedTime: serverTimestamp(),
-          });
-    
-          setRfq(prev => prev ? { ...prev, status: newStatus } : null);
-    
-          await addActionHistory(
-            rfq.id,
-            'rfq_canceled',
-            {
-              previousStatus: previousStatus,
-              newStatus: newStatus
-            }
-          );
-    
-          toast({
-            title: t('rfq_canceled_title'),
-            description: t('rfq_canceled_description', { rfqCode: rfq.rfqCode || rfq.code }),
-          });
-    
-        } catch (error) {
-          console.error('Error canceling RFQ:', error);
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Failed to cancel the RFQ.",
-          });
+            await updateDoc(doc(db, "rfqs", rfq.id), { status: 'Canceled' as RFQStatus, lastUpdatedTime: serverTimestamp() });
+            setRfq(prev => prev ? { ...prev, status: 'Canceled' } : null);
+            await addActionHistory(rfq.id, 'rfq_canceled', { previousStatus: rfq.status, newStatus: 'Canceled' });
+            toast({ title: t('rfq_canceled_title'), description: t('rfq_canceled_description', { rfqCode: rfq.rfqCode || rfq.code }) });
+        } catch {
+            toast({ variant: "destructive", title: "Error", description: "Failed to cancel the RFQ." });
         }
-      };
+    };
 
     const handleRemoveImage = (productIndex: number, imageIndex: number) => {
         setEditingImages(prev => {
             const updated = { ...prev };
-            if (!updated[productIndex]) {
-                updated[productIndex] = { existing: [], new: [] };
-            }
-            updated[productIndex] = {
-                ...updated[productIndex],
-                existing: updated[productIndex].existing.filter((_, i) => i !== imageIndex)
-            };
+            updated[productIndex] = { ...updated[productIndex], existing: updated[productIndex].existing.filter((_, i) => i !== imageIndex) };
             return updated;
         });
     };
 
     const handleAddImages = (productIndex: number, files: FileList | null) => {
         if (!files || files.length === 0) return;
-        
         const fileArray = Array.from(files);
-        const currentImages = editingImages[productIndex] || { existing: [], new: [] };
-        const totalCurrentImages = currentImages.existing.length + currentImages.new.length;
-        
-        console.log('Adding images:', {
-            productIndex,
-            filesCount: fileArray.length,
-            existingCount: currentImages.existing.length,
-            newCount: currentImages.new.length,
-            totalCurrentImages,
-            wouldExceedLimit: totalCurrentImages + fileArray.length > 5
-        });
-        
-        // Check if adding these files would exceed the limit
-        if (totalCurrentImages + fileArray.length > 5) {
-            toast({
-                variant: "destructive",
-                title: "Too Many Images",
-                description: `Maximum 5 images allowed per product. You currently have ${totalCurrentImages} images.`,
-            });
+        const current = editingImages[productIndex] || { existing: [], new: [] };
+        if (current.existing.length + current.new.length + fileArray.length > 5) {
+            toast({ variant: "destructive", title: "Too Many Images", description: `Maximum 5 images allowed per product.` });
             return;
         }
-        
         setEditingImages(prev => {
             const updated = { ...prev };
-            if (!updated[productIndex]) {
-                updated[productIndex] = { existing: [], new: [] };
-            }
-            updated[productIndex] = {
-                ...updated[productIndex],
-                new: [...updated[productIndex].new, ...fileArray]
-            };
+            if (!updated[productIndex]) updated[productIndex] = { existing: [], new: [] };
+            updated[productIndex] = { ...updated[productIndex], new: [...updated[productIndex].new, ...fileArray] };
             return updated;
         });
     };
 
-    const ImageModal = () => {
-        if (!selectedImage) return null;
-        
-        return (
-            <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-                <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>Product Image</DialogTitle>
-                    </DialogHeader>
-                    <div className="relative">
-                        <img 
-                            src={selectedImage} 
-                            alt="Product image"
-                            className="w-full h-full object-contain"
-                        />
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 bg-white/80 hover:bg-white"
-                            onClick={() => setIsImageModalOpen(false)}
-                        >
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-        );
+    const handleRemoveNewImage = (productIndex: number, imageIndex: number) => {
+        setEditingImages(prev => {
+            const updated = { ...prev };
+            updated[productIndex] = { ...updated[productIndex], new: updated[productIndex].new.filter((_, i) => i !== imageIndex) };
+            return updated;
+        });
     };
 
-    const ActionHistorySection = () => {
-            const getActionIcon = (actionType: string) => {
-                switch (actionType) {
-                    case 'rfq_created':
-                        return <FileText className="h-4 w-4 text-blue-500" />;
-                    case 'rfq_locked':
-                        return <Lock className="h-4 w-4 text-red-500" />;
-                    case 'rfq_unlocked':
-                        return <Unlock className="h-4 w-4 text-green-500" />;
-                    case 'quote_submitted':
-                        return <Send className="h-4 w-4 text-blue-500" />;
-                    case 'quote_updated':
-                        return <Edit className="h-4 w-4 text-orange-500" />;
-                    case 'quote_accepted':
-                        return <CheckCircle className="h-4 w-4 text-green-500" />;
-                    case 'quote_rejected':
-                        return <XCircle className="h-4 w-4 text-red-500" />;
-                    default:
-                        return <Clock className="h-4 w-4 text-muted-foreground" />;
-                }
-            };
+    const handleTranslate = (productId: string, fieldName: string, translatedText: string) => {
+        setTranslatedFields(prev => ({
+            ...prev,
+            [productId]: { ...prev[productId], [fieldName]: translatedText }
+        }));
+    };
 
-            if (!rfq?.actionHistory || rfq.actionHistory.length === 0) {
-                return (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <History className="h-5 w-5" />
-                                {t('action_history_title')}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                        <p className="text-sm text-muted-foreground">{t('no_action_history')}</p>
-                        </CardContent>
-                    </Card>
-                );
-            }
-        
-            const sortedHistory = [...rfq.actionHistory].sort((a, b) => 
-                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-            );
-        
-            return (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <History className="h-5 w-5" />
-                            {t('action_history_title')}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {sortedHistory.map((action) => (
-                                <div key={action.id} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                                    <div className="flex-shrink-0 mt-1">
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium text-sm">
-                                                {t(`action_${action.actionType}`)}
-                                            </span>
-                                            <span className="text-xs text-muted-foreground">
-                                                {formatFirestoreDate(action.timestamp)}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground mt-1">
-                                        {t('by')} {action.performedByName}
-                                        </p>
-                                        {action.details?.previousStatus && action.details?.newStatus && (
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {t('status_changed_from')} "{t(`status_${action.details.previousStatus.toLowerCase().replace(/ /g, '_')}`)}" 
-                                                {t('to')} "{t(`status_${action.details.newStatus.toLowerCase().replace(/ /g, '_')}`)}"
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            );
-        };
-    
-        const isUserAssigned = rfq?.assignedPurchaserIds?.includes(user?.id || '') || false;
-        const canCancel = user && rfq && (user.id === rfq.creatorId || user.role === 'Admin') && !['Canceled', 'Archived', 'Sent'].includes(rfq.status);
-    
-        if (loading) {
-            return (
-                <div className="flex h-screen w-full items-center justify-center bg-background">
-                    <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-                </div>
-            );
+    const getStatusVariant = (status: RFQStatus) => {
+        switch (status) {
+            case 'Waiting for Quote': return 'secondary';
+            case 'Locked': return 'destructive';
+            case 'Quotation in Progress': return 'default';
+            case 'Quotation Completed': return 'outline';
+            case 'Sent': return 'default';
+            case 'Canceled': case 'Archived': case 'Abandoned': return 'destructive';
+            default: return 'secondary';
         }
-    
-        if (!rfq) {
-            return (
-                <div className="flex h-screen w-full items-center justify-center bg-background">
-                    <div className="text-center">
-                        <h2 className="text-2xl font-bold">RFQ not found</h2>
-                        <Button onClick={() => router.back()} className="mt-4">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Go Back
-                        </Button>
-                    </div>
-                </div>
-            );
-        }
-        
+    };
+
+    // ── Loading / Not Found ───────────────────────────────────────────────────
+    if (loading) {
         return (
-            <div className="flex flex-col gap-6">
-    {/* Header */}
-    <div className="flex items-center gap-4">
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            </div>
+        );
+    }
+
+    if (!rfq) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-background">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold">RFQ not found</h2>
+                    <Button onClick={() => router.back()} className="mt-4">
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
+    const isUserAssigned = rfq.assignedPurchaserIds?.includes(user?.id || '') || false;
+    const canCancel = user && rfq && (user.id === rfq.creatorId || user.role === 'Admin') && !['Canceled', 'Archived', 'Sent'].includes(rfq.status);
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    return (
+        <div className="flex flex-col gap-6">
+
+            {/* Header */}
+            <div className="flex items-center gap-4">
                 <Button variant="outline" size="icon" onClick={() => router.back()}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div className="flex-1">
                     <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                        RFQ Detail {rfq.rfqCode || rfq.code || `RFQ-${rfq.id.slice(0,6)}`}
+                        RFQ Detail {rfq.rfqCode || rfq.code || `RFQ-${rfq.id.slice(0, 6)}`}
                         <Badge variant={getStatusVariant(rfq.status)}>{t(`status_${rfq.status.toLowerCase().replace(/ /g, '_')}`)}</Badge>
                     </h1>
                     <div className="flex items-center gap-4 mt-2">
@@ -961,367 +473,82 @@ export default function RFQDetailClient() {
                                 {t('locked_by', { userName: users.find(u => u.id === rfq.lockedBy)?.name || 'Unknown' })}
                             </p>
                         )}
-                         {rfq.status === 'Sent' && (
+                        {rfq.status === 'Sent' && (
                             <p className="text-sm font-semibold text-green-600 flex items-center gap-1">
-                                <CheckCircle className="h-4 w-4"/>
+                                <CheckCircle className="h-4 w-4" />
                                 {t('rfq_sent_to_customer')} by {users.find(u => u.id === rfq.sentBy)?.name || 'Unknown'} on {formatFirestoreDate(rfq.sentAt)}
                             </p>
                         )}
                     </div>
                 </div>
-                
-                {/* Lock/Unlock Toggle Button */}
-                {user?.role === 'Purchasing' && 
-                 rfq.assignedPurchaserIds.includes(user.id) && 
-                 (rfq.status === 'Waiting for Quote' || rfq.status === 'Locked') && (
-                    <Button
-                        variant={rfq.status === 'Locked' ? "destructive" : "outline"}
-                        onClick={handleLockToggle}
-                        className="flex items-center gap-2"
-                    >
-                        {rfq.status === 'Locked' ? (
-                            <>
-                                <Unlock className="h-4 w-4" />
-                                {t('button_unlock_rfq')}
-                            </>
-                        ) : (
-                            <>
-                                <Lock className="h-4 w-4" />
-                                {t('button_lock_rfq')}
-                            </>
-                        )}
+
+                {/* Lock/Unlock */}
+                {user?.role === 'Purchasing' && rfq.assignedPurchaserIds.includes(user.id) && ['Waiting for Quote', 'Locked'].includes(rfq.status) && (
+                    <Button variant={rfq.status === 'Locked' ? "destructive" : "outline"} onClick={handleLockToggle} className="flex items-center gap-2">
+                        {rfq.status === 'Locked' ? <><Unlock className="h-4 w-4" />{t('button_unlock_rfq')}</> : <><Lock className="h-4 w-4" />{t('button_lock_rfq')}</>}
                     </Button>
                 )}
-                
-                {/* Edit RFQ Button */}
-                {user?.role === 'Sales' && 
-                user.id === rfq.creatorId && 
-                rfq.status === 'Waiting for Quote' && (
-                    <Button
-                        variant="outline"
-                        onClick={() => setIsEditing(!isEditing)}
-                        className="flex items-center gap-2"
-                    >
+
+                {/* Edit */}
+                {user?.role === 'Sales' && user.id === rfq.creatorId && rfq.status === 'Waiting for Quote' && (
+                    <Button variant="outline" onClick={() => setIsEditing(!isEditing)} className="flex items-center gap-2">
                         <Edit className="h-4 w-4" />
                         {isEditing ? 'Cancel Edit' : 'Edit RFQ'}
                     </Button>
                 )}
 
-                {/* Mark as Sent Button */}
-                {user?.role === 'Sales' && 
-                rfq.status === 'Quotation Completed' && (
-                    <Button
-                        variant="default"
-                        onClick={handleMarkAsSent}
-                        className="flex items-center gap-2"
-                    >
-                        <Send className="h-4 w-4" />
-                        {t('button_mark_as_sent')}
+                {/* Mark as Sent */}
+                {user?.role === 'Sales' && rfq.status === 'Quotation Completed' && (
+                    <Button variant="default" onClick={handleMarkAsSent} className="flex items-center gap-2">
+                        <Send className="h-4 w-4" />{t('button_mark_as_sent')}
                     </Button>
                 )}
-                {/* Cancel RFQ Button */}
+
+                {/* Cancel */}
                 {canCancel && (
                     <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <Button variant="destructive" className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4" />
-                        {t('button_cancel_rfq')}
-                        </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                        <AlertDialogTitle>{t('cancel_rfq_confirmation_title')}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {t('cancel_rfq_confirmation_body')}
-                        </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                        <AlertDialogCancel>Back</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleCancelRfq}>
-                            {t('button_confirm_cancel')}
-                        </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" className="flex items-center gap-2">
+                                <XCircle className="h-4 w-4" />{t('button_cancel_rfq')}
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>{t('cancel_rfq_confirmation_title')}</AlertDialogTitle>
+                                <AlertDialogDescription>{t('cancel_rfq_confirmation_body')}</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Back</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleCancelRfq}>{t('button_confirm_cancel')}</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
                     </AlertDialog>
                 )}
             </div>
-    {/* Main Content Grid */}
-    <div className="grid md:grid-cols-3 gap-6">
+
+            {/* Main Content */}
+            <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
+
+                    {/* Editing mode */}
                     {isEditing && (
-                        <Form {...editForm}>
-                            {rfq.products.map((product, productIndex) => (
-                                <Card key={product.id}>
-                                    <CardHeader>
-                                        <CardTitle>{product.sku || 'N/A'}</CardTitle>
-                                        <CardDescription>WLID: {product.wlid}</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.productSeries`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Product Series</FormLabel>
-                                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                                <FormControl>
-                                                                    <SelectTrigger>
-                                                                        <SelectValue />
-                                                                    </SelectTrigger>
-                                                                </FormControl>
-                                                                <SelectContent>
-                                                                    <SelectItem value="Wig">Wig</SelectItem>
-                                                                    <SelectItem value="Hair Extension">Hair Extension</SelectItem>
-                                                                    <SelectItem value="Topper">Topper</SelectItem>
-                                                                    <SelectItem value="Toupee">Toupee</SelectItem>
-                                                                    <SelectItem value="Synthetic Product">Synthetic Product</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.sku`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>SKU</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.quantity`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Quantity</FormLabel>
-                                                            <FormControl>
-                                                                <Input 
-                                                                    type="number" 
-                                                                    min="1" 
-                                                                    {...field} 
-                                                                    onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                                                />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.hairFiber`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Hair Fiber</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.cap`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Cap</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.capSize`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Cap Size</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.length`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Length</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.density`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Density</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.color`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Color</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                <FormField
-                                                    control={editForm.control}
-                                                    name={`products.${productIndex}.curlStyle`}
-                                                    render={({ field }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Curl Style</FormLabel>
-                                                            <FormControl>
-                                                                <Input {...field} />
-                                                            </FormControl>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                            </div>
-
-                                            {/* Image Upload Section */}
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="text-sm font-medium">Product Images</label>
-                                                    <div className="mt-2">
-                                                        <div className="flex items-center justify-center w-full">
-                                                            <label htmlFor={`image-upload-${productIndex}`} className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted">
-                                                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                                                    <Upload className="w-8 h-8 mb-4 text-muted-foreground" />
-                                                                    <p className="mb-2 text-sm text-muted-foreground">
-                                                                        <span className="font-semibold">Click to upload</span> or drag and drop
-                                                                    </p>
-                                                                    <p className="text-xs text-muted-foreground">Max 5 images, 3MB each</p>
-                                                                </div>
-                                                                <Input 
-                                                                    id={`image-upload-${productIndex}`}
-                                                                    type="file" 
-                                                                    className="hidden" 
-                                                                    multiple 
-                                                                    accept="image/*"
-                                                                    onChange={(e) => {
-                                                                        handleAddImages(productIndex, e.target.files);
-                                                                        e.target.value = '';
-                                                                    }}
-                                                                />
-                                                            </label>
-                                                        </div>
-                                                        
-                                                        {/* Display existing images */}
-                                                        {editingImages[productIndex]?.existing && editingImages[productIndex].existing.length > 0 && (
-                                                            <div className="mt-4">
-                                                                <p className="text-sm text-muted-foreground mb-2">Current Images:</p>
-                                                                <div className="grid grid-cols-4 gap-2">
-                                                                    {editingImages[productIndex].existing.map((imageUrl, imgIndex) => (
-                                                                        <div key={imgIndex} className="relative group">
-                                                                            <img 
-                                                                                src={imageUrl} 
-                                                                                alt={`Product ${imgIndex + 1}`} 
-                                                                                className="w-full h-20 object-cover rounded-lg border"
-                                                                            />
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="destructive"
-                                                                                size="icon"
-                                                                                className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                onClick={() => handleRemoveImage(productIndex, imgIndex)}
-                                                                            >
-                                                                                <X className="h-3 w-3" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        
-                                                        {/* Display new images to be uploaded */}
-                                                        {editingImages[productIndex]?.new && editingImages[productIndex].new.length > 0 && (
-                                                            <div className="mt-4">
-                                                                <p className="text-sm text-muted-foreground mb-2">New Images to Upload:</p>
-                                                                <div className="grid grid-cols-4 gap-2">
-                                                                    {editingImages[productIndex].new.map((file, imgIndex) => (
-                                                                        <div key={imgIndex} className="relative group">
-                                                                            <img 
-                                                                                src={URL.createObjectURL(file)} 
-                                                                                alt={`New ${imgIndex + 1}`} 
-                                                                                className="w-full h-20 object-cover rounded-lg border"
-                                                                            />
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="destructive"
-                                                                                size="icon"
-                                                                                className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                onClick={() => {
-                                                                                    setEditingImages(prev => {
-                                                                                        const updated = { ...prev };
-                                                                                        updated[productIndex] = {
-                                                                                            ...updated[productIndex],
-                                                                                            new: updated[productIndex].new.filter((_, i) => i !== imgIndex)
-                                                                                        };
-                                                                                        return updated;
-                                                                                    });
-                                                                                }}
-                                                                            >
-                                                                                <X className="h-3 w-3" />
-                                                                            </Button>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </Form>
+                        <ProductEditForm
+                            rfq={rfq}
+                            editForm={editForm}
+                            editingImages={editingImages}
+                            onAddImages={handleAddImages}
+                            onRemoveImage={handleRemoveImage}
+                            onRemoveNewImage={handleRemoveNewImage}
+                            t={t}
+                        />
                     )}
 
-{!isEditing && rfq.products.map((product, productIndex) => {
-                        const quotes = rfq.quotes || [];
-                        const productQuotes = quotes.filter(q => q.productId === product.id);
+                    {/* View mode */}
+                    {!isEditing && rfq.products.map((product) => {
+                        const productQuotes = (rfq.quotes || []).filter(q => q.productId === product.id);
                         const userQuote = productQuotes.find(q => q.purchaserId === user?.id);
                         const acceptedQuote = productQuotes.find(q => q.status === 'Accepted');
-                        const canSalesAccept = user?.role === 'Sales' && !acceptedQuote && productQuotes.length > 0;
+                        const canSalesAccept = user?.role === 'Sales' && !acceptedQuote && productQuotes.some(q => q.status !== 'Abandoned');
 
                         return (
                             <Card key={product.id}>
@@ -1330,361 +557,28 @@ export default function RFQDetailClient() {
                                     <CardDescription>WLID: {product.wlid}</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                {product.images && product.images.length > 0 && (
-                                    <div className="mb-6">
-                                        <span className="text-sm text-muted-foreground">{t('product_images')}:</span>
-                                        <div className="grid grid-cols-4 gap-2 mt-2">
-                                            {product.images.map((imageUrl: string, index: number) => (
-                                                <div
-                                                    key={index}
-                                                    className="relative group cursor-pointer"
-                                                    onClick={() => {
-                                                        setSelectedImage(imageUrl);
-                                                        setIsImageModalOpen(true);
-                                                    }}
-                                                >
-                                                    <img
-                                                        src={imageUrl}
-                                                        alt={`Product ${index + 1}`}
-                                                        className="w-full h-24 object-cover rounded-lg border hover:opacity-75 transition-opacity"
-                                                    />
-                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <div className="bg-black/50 rounded-full p-2">
-                                                            <Eye className="h-4 w-4 text-white" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 gap-y-4 text-sm mb-6">
-                                <div className="grid grid-cols-2 gap-x-8">
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_product_series')}:</span>
-                                    <p className="font-medium">{product.productSeries}</p>
-                                    </div>
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_sku')}:</span>
-                                    <p className="font-medium">{product.sku || 'N/A'}</p>
-                                    </div>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 gap-x-8">
-                                    <div>
-                                    <span className={`text-muted-foreground ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
-                                        {t('field_quantity')}:
-                                    </span>
-                                    <p className={`font-medium ${(product.quantity || 1) > 1 ? 'font-bold text-red-600' : ''}`}>
-                                        {product.quantity || 1}
-                                    </p>
-                                    </div>
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_hair_fiber')}:</span>
-                                    <div className="space-y-1">
-                                        <p className="font-medium">
-                                        {translatedFields[product.id]?.hairFiber || product.hairFiber || 'N/A'}
-                                        </p>
-                                        {product.hairFiber && translatedFields[product.id]?.hairFiber && translatedFields[product.id]?.hairFiber !== product.hairFiber && (
-                                        <p className="text-xs text-muted-foreground">
-                                            原文: {product.hairFiber}
-                                        </p>
-                                        )}
-                                    </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-x-8">
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_cap')}:</span>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium flex-1">
-                                        {translatedFields[product.id]?.cap || product.cap || 'N/A'}
-                                        </p>
-                                        {product.cap && (
-                                        <TranslateButton
-                                            text={product.cap}
-                                            onTranslate={(translatedText) => {
-                                            setTranslatedFields(prev => ({
-                                                ...prev,
-                                                [product.id]: {
-                                                ...prev[product.id],
-                                                cap: translatedText
-                                                }
-                                            }));
-                                            }}
-                                            className="h-6 w-6"
-                                        />
-                                        )}
-                                    </div>
-                                    </div>
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_cap_size')}:</span>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium flex-1">
-                                        {translatedFields[product.id]?.capSize || product.capSize || 'N/A'}
-                                        </p>
-                                        {product.capSize && (
-                                        <TranslateButton
-                                            text={product.capSize}
-                                            onTranslate={(translatedText) => {
-                                            setTranslatedFields(prev => ({
-                                                ...prev,
-                                                [product.id]: {
-                                                ...prev[product.id],
-                                                capSize: translatedText
-                                                }
-                                            }));
-                                            }}
-                                            className="h-6 w-6"
-                                        />
-                                        )}
-                                    </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-x-8">
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_length')}:</span>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium flex-1">
-                                        {translatedFields[product.id]?.length || product.length || 'N/A'}
-                                        </p>
-                                        {product.length && (
-                                        <TranslateButton
-                                            text={product.length}
-                                            onTranslate={(translatedText) => {
-                                            setTranslatedFields(prev => ({
-                                                ...prev,
-                                                [product.id]: {
-                                                ...prev[product.id],
-                                                length: translatedText
-                                                }
-                                            }));
-                                            }}
-                                            className="h-6 w-6"
-                                        />
-                                        )}
-                                    </div>
-                                    </div>
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_density')}:</span>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium flex-1">
-                                        {translatedFields[product.id]?.density || product.density || 'N/A'}
-                                        </p>
-                                        {product.density && (
-                                        <TranslateButton
-                                            text={product.density}
-                                            onTranslate={(translatedText) => {
-                                            setTranslatedFields(prev => ({
-                                                ...prev,
-                                                [product.id]: {
-                                                ...prev[product.id],
-                                                density: translatedText
-                                                }
-                                            }));
-                                            }}
-                                            className="h-6 w-6"
-                                        />
-                                        )}
-                                    </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-x-8">
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_color')}:</span>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium flex-1">
-                                        {translatedFields[product.id]?.color || product.color || 'N/A'}
-                                        </p>
-                                        {product.color && (
-                                        <TranslateButton
-                                            text={product.color}
-                                            onTranslate={(translatedText) => {
-                                            setTranslatedFields(prev => ({
-                                                ...prev,
-                                                [product.id]: {
-                                                ...prev[product.id],
-                                                color: translatedText
-                                                }
-                                            }));
-                                            }}
-                                            className="h-6 w-6"
-                                        />
-                                        )}
-                                    </div>
-                                    </div>
-                                    <div>
-                                    <span className="text-muted-foreground">{t('field_curl_style')}:</span>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium flex-1">
-                                        {translatedFields[product.id]?.curlStyle || product.curlStyle || 'N/A'}
-                                        </p>
-                                        {product.curlStyle && (
-                                        <TranslateButton
-                                            text={product.curlStyle}
-                                            onTranslate={(translatedText) => {
-                                            setTranslatedFields(prev => ({
-                                                ...prev,
-                                                [product.id]: {
-                                                ...prev[product.id],
-                                                curlStyle: translatedText
-                                                }
-                                            }));
-                                            }}
-                                            className="h-6 w-6"
-                                        />
-                                        )}
-                                    </div>
-                                    </div>
-                                </div>
-                                </div>
-                                    {/* Special Notes */}
-                                    {product.specialNotes && (
-                                    <div className="col-span-2 mt-2">
-                                        <span className="text-muted-foreground">{t('field_special_notes')}:</span>
-                                        <div className="flex items-center gap-2 mt-1">
-                                        <p className="font-medium flex-1 whitespace-pre-wrap bg-muted/40 rounded-md px-3 py-2 text-sm">
-                                            {translatedFields[product.id]?.specialNotes || product.specialNotes}
-                                        </p>
-                                        <TranslateButton
-                                            text={product.specialNotes}
-                                            onTranslate={(translatedText) => {
-                                            setTranslatedFields(prev => ({
-                                                ...prev,
-                                                [product.id]: {
-                                                ...prev[product.id],
-                                                specialNotes: translatedText
-                                                }
-                                            }));
-                                            }}
-                                            className="h-6 w-6"
-                                        />
-                                        </div>
-                                    </div>
-                                    )}
-                                    
+                                    <ProductView
+                                        product={product}
+                                        translatedFields={translatedFields}
+                                        onTranslate={handleTranslate}
+                                        onImageClick={(url) => { setSelectedImage(url); setIsImageModalOpen(true); }}
+                                        t={t}
+                                    />
                                     <Separator />
-                                    <div className="mt-4">
-                                    <h4 className="font-semibold mb-2">{t('quotes')}</h4>
-                                    {productQuotes.length === 0 && <p className="text-sm text-muted-foreground">{t('no_quotes_yet')}</p>}
-                                        <div className="space-y-4">
-                                        {productQuotes.map(quote => (
-                                            <div key={quote.id || quote.purchaserId} className={`p-3 rounded-lg space-y-3 ${
-                                                quote.status === 'Accepted' ? 'bg-green-100 dark:bg-green-900/50' : 
-                                                quote.status === 'Abandoned' ? 'bg-orange-100 dark:bg-orange-900/50' : 
-                                                'bg-muted/50'
-                                            }`}>
-                                                {/* Header row with purchaser info and price */}
-                                                <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar>
-                                                    <AvatarImage src={getPurchaser(quote.purchaserId)?.avatar} />
-                                                    <AvatarFallback>{getPurchaser(quote.purchaserId)?.name?.charAt(0)}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div>
-                                                    <p className="font-semibold">{getPurchaser(quote.purchaserId)?.name}</p>
-                                                    <p className="text-sm text-muted-foreground">
-                                                    {t('quoted_on')}: {new Date(quote.quoteTime).toLocaleDateString()}
-                                                    </p>
-                                                    </div>
-                                                </div>
-                                                {/* Replace the existing price display section with this */}
-                                                    <div className="text-right">
-                                                        {quote.status === 'Abandoned' ? (
-                                                            <p className="text-lg font-bold text-orange-600">Quote Abandoned</p>
-                                                        ) : (
-                                                            <div className="space-y-1">
-                                                                {user?.role === 'Purchasing' ? (
-                                                                    // Purchasers see all three prices
-                                                                    <>
-                                                                        <p className="text-sm text-muted-foreground">Sales Cost Price:</p>
-                                                                        <p className="text-lg font-bold text-blue-600">
-                                                                            {formatRMB(quote.salesCostPriceRMB || quote.price || 0)}
-                                                                        </p>
-                                                                        <p className="text-sm text-blue-500">
-                                                                            ${(quote.salesCostPriceUSD || quote.priceUSD || 0).toFixed(2)} USD
-                                                                        </p>
-                                                                        <p className="text-sm text-muted-foreground mt-1">{t('header_sale_price')}:</p>
-                                                                        <p className="text-sm font-semibold text-green-600">
-                                                                            ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
-                                                                        </p>
-                                                                    </>
-                                                                ) : (
-                                                                    // Sales see only the Customized Product Price
-                                                                    <>
-                                                                        <p className="text-sm text-muted-foreground">{t('header_sale_price')}:</p>
-                                                                        <p className="text-lg font-bold text-green-600">
-                                                                            ${(quote.customizedProductPriceUSD || 0).toFixed(2)} USD
-                                                                        </p>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                
-                                                {/* Message section - NEW */}
-                                                {quote.notes && (
-                                                <div className="bg-background/50 p-2 rounded border-l-4 border-blue-500">
-                                                    <p className="text-sm font-medium text-blue-700 mb-1">{t('operational_notes')}:</p>
-                                                    <p className="text-sm text-muted-foreground">{quote.notes}</p>
-                                                </div>
-                                                )}
-
-                                                {/* Abandonment reason section - ADD THIS */}
-                                                {quote.status === 'Abandoned' && quote.abandonmentReason && (
-                                                    <div className="bg-orange-50 dark:bg-orange-900/20 p-2 rounded border-l-4 border-orange-500">
-                                                        <p className="text-sm font-medium text-orange-700 mb-1">{t('abandonment_reason_label')}:</p>
-                                                        <p className="text-sm text-muted-foreground">{quote.abandonmentReason}</p>
-                                                        <p className="text-xs text-muted-foreground mt-1">
-                                                            {t('abandoned_on')}: {new Date(quote.abandonedAt || quote.quoteTime).toLocaleDateString()}
-                                                        </p>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Action buttons row */}
-                                                <div className="flex items-center justify-end gap-2">
-                                                {canSalesAccept && (
-                                                    <Button size="sm" variant="outline" onClick={() => handleAcceptQuote(product.id, quote.purchaserId)}>
-                                                    <CheckCircle className="mr-2 h-4 w-4" /> {t('accept')}
-                                                    </Button>
-                                                )}
-                                                {quote.status === 'Accepted' && <Badge variant="default" className="bg-green-500">{t('accepted')}</Badge>}
-                                                {quote.status === 'Rejected' && <Badge variant="destructive">{t('rejected')}</Badge>}
-                                                {quote.status === 'Abandoned' && <Badge variant="secondary" className="bg-orange-500 text-white">{t('status_abandoned')}</Badge>}
-                                                </div>
-                                            </div>
-                                            ))}
-                                        </div>
-                                        {user?.role === 'Purchasing' && isUserAssigned && !acceptedQuote && !userQuote?.status?.includes('Abandoned') && (
-                                            <div className="mt-4 space-y-2">
-                                                <QuoteDialog 
-                                                    product={product}
-                                                    userQuote={userQuote}
-                                                    onQuoteSubmit={handleQuoteSubmit}
-                                                >
-                                                    <Button className="w-full" variant={userQuote ? 'outline' : 'default'}>
-                                                        {userQuote ? <><Edit className="mr-2 h-4 w-4" /> {t('edit_your_quote')}</> : <><Send className="mr-2 h-4 w-4" /> {t('submit_your_quote')}</>}
-                                                    </Button>
-                                                </QuoteDialog>
-                                                
-                                                <AbandonQuoteDialog
-                                                    productId={product.id}
-                                                    productName={product.sku || 'N/A'}
-                                                    onAbandonQuote={handleAbandonQuote}
-                                                >
-                                                    <Button className="w-full" variant="destructive">
-                                                        <XCircle className="mr-2 h-4 w-4" />
-                                                        {t('abandon_quote')}
-                                                    </Button>
-                                                </AbandonQuoteDialog>
-                                            </div>
-                                        )}
-                                    </div>
+                                    <QuoteSection
+                                        product={product}
+                                        productQuotes={productQuotes}
+                                        acceptedQuote={acceptedQuote}
+                                        canSalesAccept={canSalesAccept}
+                                        isUserAssigned={isUserAssigned}
+                                        userQuote={userQuote}
+                                        userRole={user?.role}
+                                        users={users}
+                                        t={t}
+                                        onAcceptQuote={handleAcceptQuote}
+                                        onQuoteSubmit={handleQuoteSubmit}
+                                        onAbandonQuote={handleAbandonQuote}
+                                    />
                                 </CardContent>
                             </Card>
                         );
@@ -1693,178 +587,44 @@ export default function RFQDetailClient() {
 
                 {/* Sidebar */}
                 <div className="space-y-6">
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('customer_and_creator')}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {!isEditing ? (
-                                <>
-                                    <div>
-                                        <h4 className="font-semibold text-sm">{t('customer')}</h4>
-                                        <p className="text-sm text-muted-foreground">{rfq.customerEmail}</p>
-                                        <Badge variant="outline" className="mt-1">{rfq.customerType}</Badge>
-                </div>
-                                    <Separator />
-                                    {creator && (
-                                        <div className="flex items-center gap-3">
-                                            <Avatar>
-                                                <AvatarImage src={creator.avatar} />
-                                                <AvatarFallback>{creator.name?.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                                <p className="font-semibold text-sm">{creator.name}</p>
-                                                <p className="text-xs text-muted-foreground">{creator.role}</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <Form {...editForm}>
-                                    <div className="space-y-4">
-                                        <FormField
-                                            control={editForm.control}
-                                            name="customerEmail"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Customer Email</FormLabel>
-                                                    <FormControl>
-                                                        <Input type="email" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={editForm.control}
-                                            name="customerType"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Customer Type</FormLabel>
-                                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="New">New</SelectItem>
-                                                            <SelectItem value="Repeating">Repeating</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
-                                </Form>
-                            )}
-                        </CardContent>
-                    </Card>
-                    
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>{t('assigned_purchasers')}</CardTitle>
-                    </CardHeader>
-                        <CardContent className="space-y-3">
-                            {!isEditing ? (
-                                <>
-                                    {rfq.assignedPurchaserIds?.map(id => {
-                                        const pUser = getPurchaser(id);
-                                        if (!pUser) return null;
-                                        return (
-                                            <div key={id} className="flex items-center gap-3">
-                                                <Avatar className="h-8 w-8">
-                                                    <AvatarImage src={pUser.avatar} />
-                                                    <AvatarFallback>{pUser.name?.charAt(0)}</AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <p className="font-semibold text-sm">{pUser.name}</p>
-                                                    <p className="text-xs text-muted-foreground">{pUser.email}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </>
-                            ) : (
-                                <Form {...editForm}>
-                                    <FormField
-                                        control={editForm.control}
-                                        name="assignedPurchaserIds"
-                                        render={() => (
-                                            <FormItem>
-                                                <FormLabel>Select Purchasers</FormLabel>
-                                                <div className="space-y-2">
-                                                    {purchasingUsers.map((pUser) => (
-                                                        <FormField
-                                                            key={pUser.id}
-                                                            control={editForm.control}
-                                                            name="assignedPurchaserIds"
-                                                            render={({ field }) => {
-                                                                return (
-                                                                    <FormItem key={pUser.id} className="flex flex-row items-start space-x-3 space-y-0">
-                                                                        <FormControl>
-                                                                            <Checkbox
-                                                                                checked={field.value?.includes(pUser.id)}
-                                                                                onCheckedChange={(checked) => {
-                                                                                    return checked
-                                                                                        ? field.onChange([...(field.value || []), pUser.id])
-                                                                                        : field.onChange(field.value?.filter((value) => value !== pUser.id));
-                                                                                }}
-                                                                            />
-                                                                        </FormControl>
-                                                                        <FormLabel className="font-normal">
-                                                                            {pUser.name}
-                                                                        </FormLabel>
-                                                                    </FormItem>
-                                                                );
-                                                            }}
-                                                        />
-                                                    ))}
-                                                </div>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </Form>
-                            )}
-                        </CardContent>
-                    </Card>
-                    <ActionHistorySection />
+                    <CustomerSidebar
+                        rfq={rfq}
+                        creator={creator}
+                        purchasingUsers={purchasingUsers}
+                        isEditing={isEditing}
+                        editForm={editForm}
+                        t={t}
+                    />
+                    <ActionHistorySection rfq={rfq} t={t} />
                 </div>
             </div>
+
+            {/* Save/Cancel bar */}
             {isEditing && (
                 <div className="flex justify-end gap-2 mt-6 border-t pt-6">
-                    <Button 
-                        variant="outline" 
-                        onClick={() => {
-                            setIsEditing(false);
-                            setEditingImages({});
-                            // Reset form to original values
-                            if(rfq) {
-                                editForm.reset({
-                                    customerType: rfq.customerType,
-                                    customerEmail: rfq.customerEmail,
-                                    assignedPurchaserIds: rfq.assignedPurchaserIds,
-                                    products: rfq.products.map(product => ({
-                                        ...product,
-                                        imageFiles: []
-                                    }))
-                                });
-                            }
-                        }}
-                    >
+                    <Button variant="outline" onClick={() => {
+                        setIsEditing(false);
+                        setEditingImages({});
+                        editForm.reset({
+                            customerType: rfq.customerType,
+                            customerEmail: rfq.customerEmail,
+                            assignedPurchaserIds: rfq.assignedPurchaserIds,
+                            products: rfq.products.map(p => ({ ...p, imageFiles: [] }))
+                        });
+                    }}>
                         Cancel
                     </Button>
                     <Button onClick={handleSaveRfq}>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Changes
+                        <Save className="mr-2 h-4 w-4" /> Save Changes
                     </Button>
                 </div>
             )}
 
-            <ImageModal />
+            <ImageModal
+                selectedImage={selectedImage}
+                isOpen={isImageModalOpen}
+                onClose={() => setIsImageModalOpen(false)}
+            />
         </div>
     );
 }
