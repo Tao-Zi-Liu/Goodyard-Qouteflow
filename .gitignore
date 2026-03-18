@@ -48,3 +48,5 @@ firestore-debug.log
 # genkit
 .genkit/**.bak
 *.bak2
+.env.staging
+.env.production

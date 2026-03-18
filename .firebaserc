@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "goodyard-qouteflow"
+    "default": "goodyard-qouteflow",
+    "production": "goodyard-qouteflow",
+    "staging": "quoteflow-staging"
   }
 }
