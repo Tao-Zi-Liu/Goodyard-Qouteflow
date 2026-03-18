@@ -47,14 +47,14 @@ export function ProductView({ product, onImageClick, t, language = 'en', product
                 <div className="mb-6">
                     <span className="text-sm text-muted-foreground">{t('product_images')}:</span>
                     <div className="grid grid-cols-4 gap-2 mt-2">
-                        {product.images.map((imageUrl: string, index: number) => (
+                        {product.images.map((imageUrl: File | string, index: number) => (
                             <div
                                 key={index}
                                 className="relative group cursor-pointer"
-                                onClick={() => onImageClick(imageUrl)}
+                                onClick={() => onImageClick(typeof imageUrl === "string" ? imageUrl : URL.createObjectURL(imageUrl))}
                             >
                                 <img
-                                    src={imageUrl}
+                                    src={typeof imageUrl === "string" ? imageUrl : URL.createObjectURL(imageUrl)}
                                     alt={`Product ${index + 1}`}
                                     className="w-full h-24 object-cover rounded-lg border hover:opacity-75 transition-opacity"
                                 />

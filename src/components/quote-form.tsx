@@ -23,7 +23,7 @@ const quoteFormSchema = z.object({
 
 type QuoteFormValues = z.infer<typeof quoteFormSchema>;
 
-interface QuoteFormProps {
+export interface QuoteFormProps {
   onSubmit: (values: QuoteFormValues) => void;
   defaultValues?: Partial<QuoteFormValues>;
   isLoading?: boolean;
@@ -110,8 +110,3 @@ export function QuoteForm({ onSubmit, defaultValues, isLoading = false }: QuoteF
     </Form>
   );
 }
-export type QuoteFormProps = {
-    onSubmit: (values: QuoteFormValues) => void;
-    defaultValues?: Partial<QuoteFormValues>;
-    isLoading?: boolean;
-  };

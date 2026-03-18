@@ -38,7 +38,7 @@ export default function PurchasingStatsPage() {
         const totalQuoted = myQuotes.length;
         
         let totalQuoteValue = 0;
-        myQuotes.forEach(q => totalQuoteValue += q.price);
+        myQuotes.forEach(q => totalQuoteValue += (q.price ?? 0));
         const avgQuoteValue = totalQuoted > 0 ? (totalQuoteValue / totalQuoted) : 0;
         
         return {

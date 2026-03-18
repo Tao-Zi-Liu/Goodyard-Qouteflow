@@ -24,7 +24,7 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
     AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { RFQ, Quote, RFQStatus, User } from '@/lib/types';
+import type { RFQ, Quote, RFQStatus, User, ActionHistory, ActionType } from "@/lib/types";
 import type { EditingImages } from './components/types';
 
 // Sub-components
@@ -176,7 +176,7 @@ export default function RFQDetailClient() {
                     });
                     const initialImages: EditingImages = {};
                     rfqData.products.forEach((p, i) => {
-                        initialImages[i] = { existing: p.images || [], new: [] };
+                        initialImages[i] = { existing: (p.images || []) as unknown as string[], new: [] };
                     });
                     setEditingImages(initialImages);
                 }
@@ -206,7 +206,7 @@ export default function RFQDetailClient() {
         };
         const updatedHistory = [...(rfq.actionHistory || []), newAction];
         await updateDoc(doc(db, "rfqs", rfqId), { actionHistory: updatedHistory });
-        setRfq(prev => prev ? { ...prev, actionHistory: updatedHistory } : null);
+        setRfq(prev => prev ? { ...prev, actionHistory: updatedHistory as ActionHistory[] } : null);
     };
 
     // ── Handlers ──────────────────────────────────────────────────────────────
@@ -334,7 +334,7 @@ export default function RFQDetailClient() {
         try {
             const abandonedQuote: Quote = {
                 id: `quote-${Date.now()}`, rfqId: rfq.id, productId, purchaserId: user.id,
-                quoteTime: new Date().toISOString(), status: 'Abandoned',
+                quoteTime: new Date().toISOString(), deliveryDate: '', status: 'Abandoned',
                 abandonmentReason: reason, abandonedAt: new Date().toISOString()
             };
             const updatedQuotes = [...rfq.quotes.filter(q => !(q.productId === productId && q.purchaserId === user.id)), abandonedQuote];

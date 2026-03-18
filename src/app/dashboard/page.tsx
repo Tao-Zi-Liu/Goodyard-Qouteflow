@@ -620,7 +620,7 @@ export default function DashboardPage() {
             };
             const updatedHistory = [...(currentRfq.actionHistory || []), newAction];
             await updateDoc(rfqRef, { actionHistory: updatedHistory });
-            setRfqs(prev => prev.map(r => r.id === rfqId ? { ...r, actionHistory: updatedHistory } : r));
+            setRfqs(prev => prev.map(r => r.id === rfqId ? { ...r, actionHistory: updatedHistory as typeof r.actionHistory } : r));
         } catch (error) { console.error('Error adding action history:', error); }
     };
 

@@ -2,7 +2,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
-import { getStorage, Storage } from 'firebase/storage'
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyAifBxtQ5bzA_I7b-uwx8RfMHyP55gQjIk",
@@ -14,33 +14,10 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-KGSE8YBS1V"
 };
 
-let app: FirebaseApp | undefined;
-let auth: Auth | undefined;
-let db: Firestore | undefined;
-let functions: Functions | undefined;
-let storage: Storage | undefined;
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth: Auth = getAuth(app);
+const db: Firestore = getFirestore(app);
+const functions: Functions = getFunctions(app);
+const storage: FirebaseStorage = getStorage(app);
 
-// Only initialize Firebase on client side
-if (typeof window !== 'undefined') {
-  try {
-    // Initialize Firebase only if it hasn't been initialized
-    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    
-    // Initialize services
-    auth = getAuth(app);
-    db = getFirestore(app);
-    functions = getFunctions(app);
-    storage = getStorage(app);
-  } catch (error) {
-    console.error('Firebase initialization error:', error);
-  }
-}
-
-// Export with type assertions for SSR
-export { 
-  app,
-  auth,
-  db,
-  functions,
-  storage
-};
+export { app, auth, db, functions, storage };

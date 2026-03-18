@@ -32,7 +32,7 @@ import { useNotifications } from '@/hooks/use-notifications';
 import { Textarea } from '@/components/ui/textarea';
 import { getApp } from 'firebase/app';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getProductFormConfig, getAvailableProductSeries, type FormField } from '@/lib/product-form-configs';
+import { getProductFormConfig, getAvailableProductSeries, type FormField as ProductFormField } from "@/lib/product-form-configs";
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -260,7 +260,7 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
               {productData?.productSeries && (() => {
               const config = getProductFormConfig(productData.productSeries);
               if (config) {
-                return config.fields.map((fieldConfig: FormField) => (
+                return config.fields.map((fieldConfig: ProductFormField) => (
                   <FormField 
                     key={fieldConfig.name}
                     control={control} 
@@ -423,7 +423,7 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
           }]
       }
   };
-            onApply(result.data);
+            onApply(Result.data);
             setIsOpen(false);
             toast({ title: 'Extraction Successful', description: 'The form has been pre-filled with the extracted data.' });
         } catch (error) {
@@ -672,7 +672,7 @@ const handleSave = async () => {
       router.push('/dashboard');
   } catch (error) {
       console.error('❌ Detailed error in handleSave:', error);
-      console.error('❌ Error stack:', error.stack);
+      console.error('❌ Error stack:', (error as Error).stack);
       console.error("Error creating RFQ: ", error);
       toast({
           variant: "destructive",

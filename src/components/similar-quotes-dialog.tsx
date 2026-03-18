@@ -39,7 +39,7 @@ export function SimilarQuotesDialog({ open, onOpenChange, quotes, purchasingUser
             <TableBody>
               {quotes.map((quote, index) => (
                 <TableRow key={index}>
-                  <TableCell className="font-medium">${quote.price.toFixed(2)}</TableCell>
+                  <TableCell className="font-medium">${(quote.price ?? 0).toFixed(2)}</TableCell>
                   <TableCell>{new Date(quote.deliveryDate).toLocaleDateString()}</TableCell>
                   <TableCell>{getPurchaserName(quote.purchaserId)}</TableCell>
                   <TableCell>
