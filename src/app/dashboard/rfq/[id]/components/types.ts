@@ -14,3 +14,5 @@ export type TranslatedFields = {
         [fieldName: string]: string;
     };
 };
+
+export type { ProductComment } from '@/lib/types';

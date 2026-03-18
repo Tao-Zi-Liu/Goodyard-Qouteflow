@@ -201,5 +201,14 @@
   "customer_type_label": "Customer Type",
   "customer_email_label": "Customer Email",
   "assign_purchaser": "Assign Purchaser",
-  "select_purchasers": "Select Purchasers"
+  "select_purchasers": "Select Purchasers",
+  "value_default": "Default",
+  "product_comments": "Comments",
+  "no_comments_yet": "No comments yet. Leave a message if you need clarification.",
+  "comment_placeholder": "Type a message...",
+  "comment_hint": "Ctrl+Enter to send quickly",
+  "notification_new_comment_title": "New Comment",
+  "notification_new_comment_body": "{authorName} left a comment on product {productName} in RFQ {rfqCode}.",
+  "original": "Original",
+  "show_original": "Show original"
 }

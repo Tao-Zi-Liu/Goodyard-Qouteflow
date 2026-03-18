@@ -19,14 +19,13 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { useNotifications } from '@/hooks/use-notifications';
 import { convertRMBToUSD, calculateCustomizedPrice } from '@/lib/currency';
-import { translateText } from '@/lib/translate';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
     AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { RFQ, Quote, RFQStatus, User } from '@/lib/types';
-import type { EditingImages, TranslatedFields } from './components/types';
+import type { EditingImages } from './components/types';
 
 // Sub-components
 import { ImageModal } from './components/image-modal';
@@ -35,6 +34,9 @@ import { ProductView } from './components/product-view';
 import { ProductEditForm } from './components/product-edit-form';
 import { QuoteSection } from './components/quote-section';
 import { CustomerSidebar } from './components/customer-sidebar';
+import { ProductComments } from './components/product-comments';
+import type { ProductComment } from '@/lib/types';
+import { translateToAllLanguages, translateProductFields } from '@/lib/gemini';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const formatFirestoreDate = (date: any): string => {
@@ -44,8 +46,6 @@ const formatFirestoreDate = (date: any): string => {
     if (typeof date === 'string') return new Date(date).toLocaleString();
     return 'N/A';
 };
-
-const isChineseText = (text: string): boolean => /[\u4e00-\u9fff]/.test(text);
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function RFQDetailClient() {
@@ -66,12 +66,94 @@ export default function RFQDetailClient() {
     const [isEditing, setIsEditing] = useState(false);
     const [editFormData, setEditFormData] = useState<any>(null);
     const [editingImages, setEditingImages] = useState<EditingImages>({});
-    const [translatedFields, setTranslatedFields] = useState<TranslatedFields>({});
 
     const editForm = useForm({
         resolver: zodResolver(rfqFormSchema),
         defaultValues: { customerType: '', customerEmail: '', assignedPurchaserIds: [], products: [] }
     });
+        // handleAddComment — 提交时翻译三语存入 Firestore
+        const handleAddComment = async (productId: string, content: string) => {
+            if (!rfq || !user) return;
+            try {
+                let translations: { en?: string; zh?: string; de?: string } = {};
+                let originalLanguage: 'en' | 'zh' | 'de' = 'en';
+                try {
+                    const result = await translateToAllLanguages(content);
+                    translations = { en: result.en, zh: result.zh, de: result.de };
+                    originalLanguage = result.originalLanguage;
+                } catch (e) {
+                    console.error('Translation failed, saving without translations:', e);
+                }
+    
+                const newComment: ProductComment = {
+                    id: `comment-${Date.now()}`,
+                    productId,
+                    rfqId: rfq.id,
+                    authorId: user.id,
+                    authorName: user.name,
+                    authorRole: user.role,
+                    content,
+                    createdAt: new Date().toISOString(),
+                    originalLanguage,
+                    translations,
+                };
+    
+                const existingComments = rfq.comments || [];
+                const updatedComments = [...existingComments, newComment];
+                await updateDoc(doc(db, 'rfqs', rfq.id), {
+                    comments: updatedComments,
+                    lastUpdatedTime: serverTimestamp(),
+                });
+    
+                setRfq(prev => prev ? { ...prev, comments: updatedComments } : null);
+                // 通知相关参与者
+                    const participants = new Set([rfq.creatorId, ...rfq.assignedPurchaserIds]);
+                    participants.delete(user.id);
+                    const productName = rfq.products.find(p => p.id === productId)?.sku || productId;
+                    participants.forEach(recipientId => {
+                        createNotification({
+                            recipientId,
+                            titleKey: 'notification_new_comment_title',
+                            bodyKey: 'notification_new_comment_body',
+                            bodyParams: { authorName: user.name, rfqCode: rfq.rfqCode || rfq.code, productName },
+                            href: `/dashboard/rfq/${rfq.id}`,
+                        });
+                    });
+            } catch (error) {
+                console.error('Failed to add comment:', error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Failed to add comment.' });
+            }
+        };
+    
+        // translateProductFieldsIfNeeded — 打开 RFQ 时翻译产品字段
+        const translateProductFieldsIfNeeded = async (rfqData: RFQ) => {
+            if (rfqData.translations) return;
+            try {
+                const allProductTranslations: RFQ['translations'] = {};
+                for (const product of rfqData.products) {
+                    const excludedFields = ['id', 'wlid', 'sku', 'productSeries', 'productId', 'images', 'imageFiles'];
+                    const stringFields: Record<string, string> = {};
+                    Object.entries(product).forEach(([k, v]) => {
+                        if (!excludedFields.includes(k) && typeof v === 'string' && v.trim()) {
+                            stringFields[k] = v;
+                        }
+                    });
+                    if (Object.keys(stringFields).length === 0) continue;
+                    const fieldTranslations = await translateProductFields(stringFields);
+                    if (Object.keys(fieldTranslations).length > 0) {
+                        allProductTranslations[product.id] = fieldTranslations;
+                    }
+                }
+                if (Object.keys(allProductTranslations).length > 0) {
+                    await updateDoc(doc(db, 'rfqs', rfqData.id), {
+                        translations: allProductTranslations,
+                    });
+                    setRfq(prev => prev ? { ...prev, translations: allProductTranslations } : null);
+                }
+            } catch (error) {
+                console.error('Failed to translate product fields:', error);
+            }
+        };
 
     // ── Fetch RFQ ─────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -83,6 +165,7 @@ export default function RFQDetailClient() {
             if (docSnap.exists()) {
                 const rfqData = { id: docSnap.id, ...docSnap.data(), quotes: docSnap.data().quotes || [] } as RFQ;
                 setRfq(rfqData);
+                translateProductFieldsIfNeeded(rfqData); // 异步，不阻塞页面加载
 
                 if (!editFormData) {
                     editForm.reset({
@@ -112,27 +195,6 @@ export default function RFQDetailClient() {
         };
         fetchRfq();
     }, [params.id, router, toast]);
-
-    // ── Auto-translate on language change ─────────────────────────────────────
-    useEffect(() => {
-        if (!rfq || language !== 'zh') return;
-        rfq.products.forEach(product => {
-            const allFieldNames = Object.keys(product).filter(k =>
-                typeof (product as any)[k] === 'string' && !['id', 'wlid', 'sku', 'productSeries', 'imageFiles'].includes(k)
-            );
-            allFieldNames.forEach(field => {
-                const value = (product as any)[field];
-                if (value && !isChineseText(value)) {
-                    translateText(value, 'zh').then(result => {
-                        setTranslatedFields(prev => ({
-                            ...prev,
-                            [product.id]: { ...prev[product.id], [field]: result.translatedText }
-                        }));
-                    }).catch(() => {});
-                }
-            });
-        });
-    }, [rfq, language]);
 
     // ── Action History ────────────────────────────────────────────────────────
     const addActionHistory = async (rfqId: string, actionType: string, details?: any) => {
@@ -406,13 +468,6 @@ export default function RFQDetailClient() {
         });
     };
 
-    const handleTranslate = (productId: string, fieldName: string, translatedText: string) => {
-        setTranslatedFields(prev => ({
-            ...prev,
-            [productId]: { ...prev[productId], [fieldName]: translatedText }
-        }));
-    };
-
     const getStatusVariant = (status: RFQStatus) => {
         switch (status) {
             case 'Waiting for Quote': return 'secondary';
@@ -557,12 +612,12 @@ export default function RFQDetailClient() {
                                     <CardDescription>WLID: {product.wlid}</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <ProductView
+                                <ProductView
                                         product={product}
-                                        translatedFields={translatedFields}
-                                        onTranslate={handleTranslate}
                                         onImageClick={(url) => { setSelectedImage(url); setIsImageModalOpen(true); }}
                                         t={t}
+                                        language={language}
+                                        productTranslations={rfq.translations?.[product.id]}
                                     />
                                     <Separator />
                                     <QuoteSection
@@ -578,6 +633,14 @@ export default function RFQDetailClient() {
                                         onAcceptQuote={handleAcceptQuote}
                                         onQuoteSubmit={handleQuoteSubmit}
                                         onAbandonQuote={handleAbandonQuote}
+                                    />
+                                    <Separator />
+                                    <ProductComments
+                                        productId={product.id}
+                                        comments={(rfq.comments || []).filter(c => c.productId === product.id)}
+                                        currentUser={user as any}
+                                        onAddComment={handleAddComment}
+                                        t={t}
                                     />
                                 </CardContent>
                             </Card>

@@ -10,10 +10,10 @@ export function convertRMBToUSD(rmbAmount: number): number {
 
 /**
  * Calculate Customized Product Price in USD
- * Formula: (RMB ÷ 2.7 + 40) × 1.075
+ * Formula: (RMB ÷ 2.88 + 40) × 1.075 + 40
  */
 export function calculateCustomizedPrice(rmbAmount: number): number {
-  const result = (rmbAmount / 2.7 + 40) * 1.075;
+  const result = (rmbAmount / 2.88 + 40) * 1.075 + 40;
   return Math.round(result * 100) / 100;
 }
 

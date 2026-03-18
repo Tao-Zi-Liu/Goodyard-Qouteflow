@@ -116,6 +116,16 @@ export interface RFQ {
   rfqCode?: string; // Optional RFQ code field
   sentBy?: string; // User ID of who marked as sent
   sentAt?: any; // Timestamp of when it was sent
+  comments?: ProductComment[];
+  translations?: {
+    [productId: string]: {
+      [fieldName: string]: {
+        en?: string;
+        zh?: string;
+        de?: string;
+      };
+    };
+  };
 }
 
 export interface AppNotification {
@@ -127,4 +137,21 @@ export interface AppNotification {
   read: boolean;
   recipientId: string;
   href?: string;
+}
+
+export interface ProductComment {
+  id: string;
+  productId: string;
+  rfqId: string;
+  authorId: string;
+  authorName: string;
+  authorRole: UserRole;
+  content: string;
+  createdAt: string;
+  originalLanguage?: 'en' | 'zh' | 'de';   // 新增
+  translations?: {                            // 新增
+    en?: string;
+    zh?: string;
+    de?: string;
+  };
 }

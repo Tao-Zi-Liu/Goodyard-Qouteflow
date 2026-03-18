@@ -1,30 +1,44 @@
 "use client";
 
-import { Eye, X } from 'lucide-react';
-import { TranslateButton } from '@/components/translate-button';
+import { Eye } from 'lucide-react';
 import { getProductFormConfig } from '@/lib/product-form-configs';
 import type { Product } from './types';
-import type { TranslatedFields } from './types';
+
+type SupportedLanguage = 'en' | 'zh' | 'de';
+
+interface ProductTranslations {
+    [fieldName: string]: {
+        en?: string;
+        zh?: string;
+        de?: string;
+    };
+}
 
 interface ProductViewProps {
     product: Product;
-    translatedFields: TranslatedFields;
-    onTranslate: (productId: string, fieldName: string, translatedText: string) => void;
     onImageClick: (url: string) => void;
     t: (key: string, params?: any) => string;
+    language?: string;
+    productTranslations?: ProductTranslations;
 }
 
-export function ProductView({ product, translatedFields, onTranslate, onImageClick, t }: ProductViewProps) {
+export function ProductView({ product, onImageClick, t, language = 'en', productTranslations }: ProductViewProps) {
     const config = getProductFormConfig(product.productSeries);
     const fields = config ? config.fields.filter(f => f.name !== 'sku') : [];
     const nonTextareaFields = fields.filter(f => f.type !== 'textarea');
     const textareaFields = fields.filter(f => f.type === 'textarea');
 
-    // Group non-textarea fields into pairs for 2-column layout
     const pairs: typeof nonTextareaFields[] = [];
     for (let i = 0; i < nonTextareaFields.length; i += 2) {
         pairs.push(nonTextareaFields.slice(i, i + 2));
     }
+
+    // 获取某字段的译文，若与原文相同或不存在则返回 null
+    const getTranslation = (fieldName: string, originalValue: string): string | null => {
+        const translation = productTranslations?.[fieldName]?.[language as SupportedLanguage];
+        if (!translation || translation === originalValue) return null;
+        return translation;
+    };
 
     return (
         <div>
@@ -57,6 +71,7 @@ export function ProductView({ product, translatedFields, onTranslate, onImageCli
 
             {/* Fields */}
             <div className="grid grid-cols-1 gap-y-4 text-sm mb-6">
+
                 {/* Product Series + SKU */}
                 <div className="grid grid-cols-2 gap-x-8">
                     <div>
@@ -65,7 +80,7 @@ export function ProductView({ product, translatedFields, onTranslate, onImageCli
                     </div>
                     <div>
                         <span className="text-muted-foreground">{t('field_sku')}:</span>
-                        <p className="font-medium">{product.sku || 'N/A'}</p>
+                        <p className="font-medium">{product.sku || t('value_default')}</p>
                     </div>
                 </div>
 
@@ -81,28 +96,21 @@ export function ProductView({ product, translatedFields, onTranslate, onImageCli
                     </div>
                 </div>
 
-                {/* Dynamic fields from product-form-configs, in pairs */}
+                {/* Dynamic fields in pairs */}
                 {pairs.map((pair, pairIndex) => (
                     <div key={pairIndex} className="grid grid-cols-2 gap-x-8">
                         {pair.map((fieldConfig) => {
                             const fieldValue = (product as any)[fieldConfig.name];
-                            const translatedValue = translatedFields[product.id]?.[fieldConfig.name];
-                            const displayValue = translatedValue || fieldValue || 'N/A';
+                            const translation = fieldValue ? getTranslation(fieldConfig.name, fieldValue) : null;
                             return (
                                 <div key={fieldConfig.name}>
                                     <span className="text-muted-foreground">{t(fieldConfig.label)}:</span>
-                                    <div className="flex items-center gap-2">
-                                        <p className="font-medium flex-1">{displayValue}</p>
-                                        {fieldValue && (
-                                            <TranslateButton
-                                                text={fieldValue}
-                                                onTranslate={(translatedText) =>
-                                                    onTranslate(product.id, fieldConfig.name, translatedText)
-                                                }
-                                                className="h-6 w-6"
-                                            />
-                                        )}
-                                    </div>
+                                    <p className="font-medium">{fieldValue || t('value_default')}</p>
+                                    {translation && (
+                                        <p className="text-xs text-muted-foreground italic mt-0.5 bg-muted/60 rounded px-2 py-0.5">
+                                            {translation}
+                                        </p>
+                                    )}
                                 </div>
                             );
                         })}
@@ -112,23 +120,19 @@ export function ProductView({ product, translatedFields, onTranslate, onImageCli
                 {/* Textarea fields (e.g. Special Notes) */}
                 {textareaFields.map((fieldConfig) => {
                     const fieldValue = (product as any)[fieldConfig.name];
-                    const translatedValue = translatedFields[product.id]?.[fieldConfig.name];
                     if (!fieldValue) return null;
+                    const translation = getTranslation(fieldConfig.name, fieldValue);
                     return (
                         <div key={fieldConfig.name} className="col-span-2 mt-2">
                             <span className="text-muted-foreground">{t(fieldConfig.label)}:</span>
-                            <div className="flex items-center gap-2 mt-1">
-                                <p className="font-medium flex-1 whitespace-pre-wrap break-all bg-muted/40 rounded-md px-3 py-2 text-sm">
-                                    {translatedValue || fieldValue}
+                            <p className="font-medium whitespace-pre-wrap break-all bg-muted/40 rounded-md px-3 py-2 text-sm mt-1">
+                                {fieldValue}
+                            </p>
+                            {translation && (
+                                <p className="text-xs text-muted-foreground italic mt-1 bg-muted/60 rounded px-2 py-1 whitespace-pre-wrap">
+                                    {translation}
                                 </p>
-                                <TranslateButton
-                                    text={fieldValue}
-                                    onTranslate={(translatedText) =>
-                                        onTranslate(product.id, fieldConfig.name, translatedText)
-                                    }
-                                    className="h-6 w-6"
-                                />
-                            </div>
+                            )}
                         </div>
                     );
                 })}

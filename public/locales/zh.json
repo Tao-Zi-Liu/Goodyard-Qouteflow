@@ -201,5 +201,14 @@
   "customer_type_label": "客户类型",
   "customer_email_label": "客户邮箱",
   "assign_purchaser": "分配采购员",
-  "select_purchasers": "选择采购员"
+  "select_purchasers": "选择采购员",
+  "value_default": "默认",
+  "product_comments": "沟通留言",
+  "no_comments_yet": "暂无留言，有问题请在此留言沟通。",
+  "comment_placeholder": "输入留言内容...",
+  "comment_hint": "Ctrl+Enter 快速发送",
+  "notification_new_comment_title": "新留言",
+  "notification_new_comment_body": "{authorName} 在询价单 {rfqCode} 的产品 {productName} 中留言。",
+  "original": "原文",
+  "show_original": "显示原文"
 }

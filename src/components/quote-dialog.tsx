@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState } from 'react';
@@ -13,7 +12,6 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { Product, Quote } from '@/lib/types';
 import { convertRMBToUSD, calculateCustomizedPrice, formatRMB, formatUSD } from '@/lib/currency';
-import { TranslateButton } from '@/components/translate-button';
 import { useI18n } from '@/hooks/use-i18n';
 
 interface QuoteDialogProps {
@@ -34,14 +32,10 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   const [message, setMessage] = useState(userQuote?.notes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t } = useI18n();
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!price || !deliveryDate) {
-      return;
-    }
-
+    if (!price || !deliveryDate) return;
     setIsSubmitting(true);
     try {
       await onQuoteSubmit(product.id, Number(price), deliveryDate, message, userQuote);
@@ -54,14 +48,11 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   };
 
   const resetForm = () => {
-    setPrice(
-      userQuote?.salesCostPriceRMB?.toString() || userQuote?.price?.toString() || ''
-    );
+    setPrice(userQuote?.salesCostPriceRMB?.toString() || userQuote?.price?.toString() || '');
     setDeliveryDate(userQuote?.deliveryDate ? new Date(userQuote.deliveryDate) : undefined);
     setMessage(userQuote?.notes || '');
   };
 
-  // Calculate all prices for preview
   const rmbPrice = price && !isNaN(Number(price)) ? Number(price) : 0;
   const salesCostUSD = rmbPrice > 0 ? convertRMBToUSD(rmbPrice) : 0;
   const customizedPriceUSD = rmbPrice > 0 ? calculateCustomizedPrice(rmbPrice) : 0;
@@ -69,9 +60,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
       setOpen(newOpen);
-      if (newOpen) {
-        resetForm();
-      }
+      if (newOpen) resetForm();
     }}>
       <DialogTrigger asChild>
         {children}
@@ -123,7 +112,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
                 )}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">{t('delivery_date')}</Label>
               <div className="col-span-3">
@@ -152,28 +141,20 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
                 </Popover>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="message" className="text-right pt-2">
                 {t('message')}
               </Label>
               <div className="col-span-3 space-y-2">
-                <div className="flex gap-2">
-                  <textarea
-                    id="message"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    placeholder={t('add_operational_notes')}
-                    maxLength={300}
-                  />
-                  <div className="flex-shrink-0 pt-1">
-                    <TranslateButton
-                      text={message}
-                      onTranslate={(translatedText) => setMessage(translatedText)}
-                    />
-                  </div>
-                </div>
+                <textarea
+                  id="message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  placeholder={t('add_operational_notes')}
+                  maxLength={300}
+                />
                 <div className="text-xs text-muted-foreground text-right">
                   {message.length}/300 {t('characters')}
                 </div>

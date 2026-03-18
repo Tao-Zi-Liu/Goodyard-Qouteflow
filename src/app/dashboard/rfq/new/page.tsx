@@ -33,7 +33,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { getApp } from 'firebase/app';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getProductFormConfig, getAvailableProductSeries, type FormField } from '@/lib/product-form-configs';
-import { TranslateButton } from '@/components/translate-button';
 
 type RfqFormValues = z.infer<typeof rfqFormSchema>;
 
@@ -273,9 +272,9 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
                           {t(fieldConfig.label)}
                         </FormLabel>
                         <FormControl>
-                            <div className="flex gap-2">
+                        <div>
                               {fieldConfig.type === 'textarea' ? (
-                                <div className="flex-1 space-y-2">
+                                <div className="space-y-2">
                                   <textarea
                                     {...field}
                                     id={`product-${index}-${fieldConfig.name}`}
@@ -290,22 +289,14 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
                                   </div>
                                 </div>
                               ) : (
-                                <Input 
-                                  {...field} 
+                                <Input
+                                  {...field}
                                   id={`product-${index}-${fieldConfig.name}`}
                                   value={field.value || ''}
                                   placeholder={fieldConfig.placeholder}
-                                  className="placeholder:text-muted-foreground/60 flex-1"
+                                  className="placeholder:text-muted-foreground/60"
                                 />
                               )}
-                              <div className="flex-shrink-0 pt-1">
-                                <TranslateButton
-                                  text={field.value || ''}
-                                  onTranslate={(translatedText) => {
-                                    field.onChange(translatedText);
-                                  }}
-                                />
-                              </div>
                             </div>
                           </FormControl>
                         <FormMessage />
@@ -662,7 +653,7 @@ const handleSave = async () => {
           products: productsWithImages
       });
 
-      // Send notifications to assigned purchasers
+      /*// Send notifications to assigned purchasers
       for (const purchaserId of formData.assignedPurchaserIds) {
           await createNotification({
               recipientId: purchaserId,
@@ -671,11 +662,11 @@ const handleSave = async () => {
               bodyParams: { rfqCode: newRfqCode, salesName: user.name },
               href: `/dashboard/rfq/${newRfqId}`,
           });
-      }
+      }*/
 
       toast({
           title: "RFQ Created",
-          description: "The new RFQ has been successfully created and purchasers have been notified.",
+          description: "The new RFQ has been successfully created.",
       });
       setIsPreviewOpen(false);
       router.push('/dashboard');

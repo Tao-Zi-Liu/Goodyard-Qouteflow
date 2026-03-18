@@ -470,11 +470,11 @@ const RFQTable = ({
                                             })()}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{rfq.customerType || 'N/A'}</TableCell>
-                                    <TableCell>{rfq.customerEmail || 'N/A'}</TableCell>
-                                    <TableCell>{firstProduct?.sku || 'N/A'}</TableCell>
-                                    <TableCell>{firstProduct?.color || 'N/A'}</TableCell>
-                                    <TableCell>{firstProduct?.length || 'N/A'}</TableCell>
+                                    <TableCell>{rfq.customerType || t('value_default')}</TableCell>
+                                    <TableCell>{rfq.customerEmail || t('value_default')}</TableCell>
+                                    <TableCell>{firstProduct?.sku || t('value_default')}</TableCell>
+                                    <TableCell>{firstProduct?.color || t('value_default')}</TableCell>
+                                    <TableCell>{firstProduct?.length || t('value_default')}</TableCell>
                                     <TableCell>
                                         {rfq.quotes && rfq.quotes.length > 0 ? (
                                             <div className="grid gap-1">
