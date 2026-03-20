@@ -1,8 +1,6 @@
 // next.config.ts
 import type {NextConfig} from 'next';
-
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -19,18 +17,24 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Enable standalone output for Firebase App Hosting
   output: 'standalone',
-  // Ensure experimental features are compatible
-  experimental: {
-    // Remove any experimental features that might conflict
-  },
-  // Add trailingSlash for better compatibility
+  experimental: {},
   trailingSlash: false,
-  // Ensure static generation works properly
   generateBuildId: async () => {
     return 'build-' + Date.now().toString();
   },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Robots-Tag',
+            value: 'noindex, nofollow, noarchive, nosnippet',
+          },
+        ],
+      },
+    ];
+  },
 };
-
 export default nextConfig;
