@@ -23,6 +23,21 @@ const nextConfig: NextConfig = {
   generateBuildId: async () => {
     return 'build-' + Date.now().toString();
   },
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'quoteflow-app--goodyard-qouteflow.us-central1.hosted.app',
+          },
+        ],
+        destination: 'https://rfq.apperanz.com/:path*',
+        permanent: true, // 301 永久重定向
+      },
+    ];
+  },
   async headers() {
     return [
       {
