@@ -213,5 +213,20 @@
   "show_original": "Show original",
   "button_copy_rfq": "Copy RFQ",
   "rfq_copied": "RFQ Copied",
-  "rfq_copied_description": "A new RFQ has been created based on the original."
+  "rfq_copied_description": "A new RFQ has been created based on the original.",
+  "user_role_order_manager": "Order Manager",
+  "status_waiting_for_assign": "Waiting for Assign",
+  "assigned_by": "Assigned by {name} on {time}",
+  "button_assign_purchasers": "Assign Purchasers",
+  "button_save_assignment": "Save Assignment",
+  "rfq_assigned": "RFQ Assigned",
+  "rfq_assigned_description": "Purchasers have been assigned to this RFQ.",
+  "notification_rfq_assigned_title": "New RFQ Assigned",
+  "notification_rfq_assigned_body": "RFQ {rfqCode} has been assigned to you by {managerName}.",
+  "notification_new_rfq_manager_title": "New RFQ Pending Assignment",
+  "notification_new_rfq_manager_body": "A new RFQ {rfqCode} has been created by {salesName} and needs assignment.",
+  "dashboard_unassigned_tab": "Unassigned",
+  "dashboard_all_rfqs_tab_om": "All RFQs",
+  "purchaser_already_quoted": "Already quoted",
+  "reassign_not_allowed": "Cannot remove purchasers who have already submitted quotes."
 }

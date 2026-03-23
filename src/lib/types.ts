@@ -1,5 +1,5 @@
 
-export type UserRole = 'Admin' | 'Sales' | 'Purchasing';
+export type UserRole = 'Admin' | 'Sales' | 'Purchasing' | 'Order Manager';
 export type Language = 'en' | 'de' | 'zh';
 
 export interface User {
@@ -20,7 +20,7 @@ export interface User {
   updatedAt?: string; // When the user was last updated
 }
 
-export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed'| 'Sent'   | 'Abandoned' | 'Closed' | 'Archived' | 'Canceled';
+export type RFQStatus = 'Waiting for Assign' | 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed' | 'Sent' | 'Abandoned' | 'Closed' | 'Archived' | 'Canceled';
 export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee' | 'Hair Patch';
 
 export interface Product {
@@ -79,7 +79,8 @@ export type ActionType =
   | 'rfq_sent'
   | 'rfq_edited'
   | 'quote_abandoned'
-  | 'rfq_canceled';
+  | 'rfq_canceled'
+  | 'rfq_assigned';
 
   export interface ActionHistory {
     id: string;
@@ -114,6 +115,9 @@ export interface RFQ {
   actionHistory?: ActionHistory[];
   lastUpdatedTime?: any; // NEW FIELD: Track last update for quotes, locks, and edits
   rfqCode?: string; // Optional RFQ code field
+  assignedBy?: string;       // Order Manager user ID who assigned
+  assignedByName?: string;   // Order Manager name for display
+  assignedAt?: any;          // Timestamp of assignment
   sentBy?: string; // User ID of who marked as sent
   sentAt?: any; // Timestamp of when it was sent
   comments?: ProductComment[];

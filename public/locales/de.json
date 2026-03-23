@@ -161,5 +161,20 @@
   "rfq_canceled_description": "Anfrage {rfqCode} wurde storniert.",
   "button_copy_rfq": "Anfrage kopieren",
   "rfq_copied": "Anfrage kopiert",
-  "rfq_copied_description": "Eine neue Anfrage wurde basierend auf dem Original erstellt."
+  "rfq_copied_description": "Eine neue Anfrage wurde basierend auf dem Original erstellt.",
+  "user_role_order_manager": "Bestellmanager",
+  "status_waiting_for_assign": "Warten auf Zuweisung",
+  "assigned_by": "Zugewiesen von {name} am {time}",
+  "button_assign_purchasers": "Einkäufer zuweisen",
+  "button_save_assignment": "Zuweisung speichern",
+  "rfq_assigned": "Anfrage zugewiesen",
+  "rfq_assigned_description": "Den Einkäufern wurde diese Anfrage zugewiesen.",
+  "notification_rfq_assigned_title": "Neue Anfrage zugewiesen",
+  "notification_rfq_assigned_body": "Anfrage {rfqCode} wurde Ihnen von {managerName} zugewiesen.",
+  "notification_new_rfq_manager_title": "Neue Anfrage wartet auf Zuweisung",
+  "notification_new_rfq_manager_body": "{salesName} hat eine neue Anfrage {rfqCode} erstellt, die zugewiesen werden muss.",
+  "dashboard_unassigned_tab": "Nicht zugewiesen",
+  "dashboard_all_rfqs_tab_om": "Alle Anfragen",
+  "purchaser_already_quoted": "Bereits angeboten",
+  "reassign_not_allowed": "Einkäufer, die bereits Angebote eingereicht haben, können nicht entfernt werden."
 }

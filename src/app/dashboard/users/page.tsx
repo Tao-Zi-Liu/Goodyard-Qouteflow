@@ -180,6 +180,7 @@ export default function UsersPage() {
             case 'Admin': return 'destructive';
             case 'Sales': return 'default';
             case 'Purchasing': return 'secondary';
+            case 'Order Manager': return 'default';
             default: return 'outline';
         }
     };
@@ -246,6 +247,7 @@ export default function UsersPage() {
                                         <SelectItem value="Admin">Administrator</SelectItem>
                                         <SelectItem value="Sales">Sales</SelectItem>
                                         <SelectItem value="Purchasing">Purchasing</SelectItem>
+                                        <SelectItem value="Order Manager">Order Manager</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

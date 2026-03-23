@@ -213,5 +213,20 @@
   "show_original": "显示原文",
   "button_copy_rfq": "复制询价单",
   "rfq_copied": "询价单已复制",
-  "rfq_copied_description": "已基于原询价单创建新的询价单。"
+  "rfq_copied_description": "已基于原询价单创建新的询价单。",
+  "user_role_order_manager": "订单经理",
+  "status_waiting_for_assign": "待分配",
+  "assigned_by": "由 {name} 于 {time} 分配",
+  "button_assign_purchasers": "分配报价人",
+  "button_save_assignment": "保存分配",
+  "rfq_assigned": "已分配",
+  "rfq_assigned_description": "报价人已成功分配至该询价单。",
+  "notification_rfq_assigned_title": "新询价单已分配",
+  "notification_rfq_assigned_body": "询价单 {rfqCode} 已由 {managerName} 分配给您。",
+  "notification_new_rfq_manager_title": "新询价单待分配",
+  "notification_new_rfq_manager_body": "{salesName} 创建了新询价单 {rfqCode}，需要您进行分配。",
+  "dashboard_unassigned_tab": "待分配",
+  "dashboard_all_rfqs_tab_om": "全部询价单",
+  "purchaser_already_quoted": "已报价",
+  "reassign_not_allowed": "无法移除已提交报价的报价人。"
 }

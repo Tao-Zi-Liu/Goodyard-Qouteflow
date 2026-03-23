@@ -258,6 +258,7 @@ const RFQTable = ({
                                     <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('all')} /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">{t('all')}</SelectItem>
+                                        <SelectItem value="Waiting for Assign">{t('status_waiting_for_assign')}</SelectItem>
                                         <SelectItem value="Waiting for Quote">{t('status_waiting_for_quote')}</SelectItem>
                                         <SelectItem value="Locked">{t('status_locked')}</SelectItem>
                                         <SelectItem value="Quotation in Progress">{t('status_quotation_in_progress')}</SelectItem>
@@ -721,6 +722,7 @@ export default function DashboardPage() {
     const getStatusVariant = useCallback((status: RFQStatus) => {
         switch (status) {
             case 'Waiting for Quote': return 'secondary';
+            case 'Waiting for Assign': return 'outline';
             case 'Locked': return 'destructive';
             case 'Quotation in Progress': return 'default';
             case 'Quotation Completed': return 'outline';
@@ -775,6 +777,7 @@ export default function DashboardPage() {
     const requiresMyQuote = applyFilters(rfqs.filter(rfq =>
         rfq.assignedPurchaserIds?.includes(user?.id || '') && rfq.status !== 'Quotation Completed'
     ));
+    const unassignedRfqs = applyFilters(rfqs.filter(r => r.status === 'Waiting for Assign'));
 
     const handleCopyRfq = async (rfq: RFQ) => {
         if (!user || user.role !== 'Sales') return;
@@ -838,12 +841,18 @@ export default function DashboardPage() {
                 </Card>
             )}
 
-            <Tabs defaultValue={user?.role === 'Sales' ? 'my_rfqs' : user?.role === 'Purchasing' ? 'my_quotes' : 'all_rfqs'}>
-                <TabsList>
-                    {user?.role === 'Sales' && <TabsTrigger value="my_rfqs">{t('dashboard_my_rfqs_tab')}</TabsTrigger>}
-                    {user?.role === 'Purchasing' && <TabsTrigger value="my_quotes">{t('dashboard_my_quotes_tab')}</TabsTrigger>}
-                    <TabsTrigger value="all_rfqs">{t('dashboard_all_rfqs_tab')}</TabsTrigger>
-                </TabsList>
+                <Tabs defaultValue={
+                    user?.role === 'Sales' ? 'my_rfqs' :
+                    user?.role === 'Purchasing' ? 'my_quotes' :
+                    user?.role === 'Order Manager' ? 'unassigned' :
+                    'all_rfqs'
+                }>
+            <TabsList>
+                {user?.role === 'Sales' && <TabsTrigger value="my_rfqs">{t('dashboard_my_rfqs_tab')}</TabsTrigger>}
+                {user?.role === 'Purchasing' && <TabsTrigger value="my_quotes">{t('dashboard_my_quotes_tab')}</TabsTrigger>}
+                {user?.role === 'Order Manager' && <TabsTrigger value="unassigned">{t('dashboard_unassigned_tab')}</TabsTrigger>}
+                <TabsTrigger value="all_rfqs">{t('dashboard_all_rfqs_tab')}</TabsTrigger>
+            </TabsList>
                 <Card className="mt-4">
                     <CardContent className="p-0">
                         <TabsContent value="all_rfqs" className="m-0">
@@ -857,6 +866,11 @@ export default function DashboardPage() {
                         {user?.role === 'Purchasing' && (
                             <TabsContent value="my_quotes" className="m-0">
                                 <RFQTable data={requiresMyQuote} {...tableProps} />
+                            </TabsContent>
+                        )}
+                        {user?.role === 'Order Manager' && (
+                            <TabsContent value="unassigned" className="m-0">
+                                <RFQTable data={unassignedRfqs} {...tableProps} />
                             </TabsContent>
                         )}
                     </CardContent>

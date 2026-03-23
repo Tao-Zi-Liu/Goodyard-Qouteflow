@@ -607,7 +607,7 @@ const handleSave = async () => {
           products: [], // Will update with image URLs
           inquiryTime: serverTimestamp(),
           creatorId: user.id,
-          status: 'Waiting for Quote',
+          status: 'Waiting for Assign',
           quotes: [],
           lastUpdatedTime: serverTimestamp(),
       };
@@ -653,16 +653,21 @@ const handleSave = async () => {
           products: productsWithImages
       });
 
-      /*// Send notifications to assigned purchasers
-      for (const purchaserId of formData.assignedPurchaserIds) {
+      // Notify all active Order Managers
+      const allUsersSnap = await getDocs(collection(db, 'users'));
+      const orderManagers = allUsersSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }) as User)
+          .filter(u => u.role === 'Order Manager' && u.status === 'Active');
+
+      for (const manager of orderManagers) {
           await createNotification({
-              recipientId: purchaserId,
-              titleKey: 'notification_new_rfq_title',
-              bodyKey: 'notification_new_rfq_body',
+              recipientId: manager.id,
+              titleKey: 'notification_new_rfq_manager_title',
+              bodyKey: 'notification_new_rfq_manager_body',
               bodyParams: { rfqCode: newRfqCode, salesName: user.name },
               href: `/dashboard/rfq/${newRfqId}`,
           });
-      }*/
+      }
 
       toast({
           title: "RFQ Created",
@@ -868,19 +873,15 @@ const handleSave = async () => {
           </DialogHeader>
           {formData && (
             <div className="grid gap-6 max-h-[60vh] overflow-y-auto p-2">
+                {/* Assign Purchaser — read only, assignment handled by Order Manager */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Details</CardTitle>
+                        <CardTitle className="text-base">{t('assign_purchaser')}</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                        <div className="flex justify-between"><span className="text-muted-foreground">Customer Type</span><span>{formData.customerType}</span></div>
-                        <div className="flex justify-between"><span className="text-muted-foreground">Customer Email</span><span>{formData.customerEmail}</span></div>
-                         <div className="flex justify-between items-start">
-                            <span className="text-muted-foreground">Assigned Purchasers</span>
-                            <div className="flex flex-col items-end gap-1">
-                                {formData.assignedPurchaserIds.map(id => <Badge key={id} variant="secondary">{getPurchaserName(id)}</Badge>)}
-                            </div>
-                        </div>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                            Purchaser assignment is handled by the Order Manager after submission.
+                        </p>
                     </CardContent>
                 </Card>
 
