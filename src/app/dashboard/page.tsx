@@ -19,7 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { copyRfq } from '@/lib/copy-rfq';
 import { Copy } from 'lucide-react'
-
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 // ─────────────────────────────────────────────────────────────────────────────
 // All helper components are at module level so their internal useState hooks
 // are stable across parent re-renders.
@@ -497,18 +497,26 @@ const RFQTable = ({
                                     <TableCell>{formatFirestoreDate(rfq.inquiryTime)}</TableCell>
                                     <TableCell>{formatFirestoreDate(rfq.lastUpdatedTime || rfq.inquiryTime)}</TableCell>
                                     <TableCell>{getCreatorName(rfq.creatorId)}</TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell>
                                         <Checkbox checked={rfq.status === 'Sent'} disabled aria-label="Sent status" />
                                     </TableCell>
                                     {onCopyRfq && (
-                                        <TableCell className="text-right">
-                                            <button
-                                                title="Duplicate RFQ"
-                                                onClick={() => onCopyRfq(rfq)}
-                                                className="p-1.5 rounded hover:bg-muted transition-colors"
-                                            >
-                                                <Copy className="h-4 w-4 text-muted-foreground" />
-                                            </button>
+                                        <TableCell>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <button
+                                                            onClick={() => onCopyRfq(rfq)}
+                                                            className="p-1.5 rounded hover:bg-muted transition-colors"
+                                                        >
+                                                            <Copy className="h-4 w-4 text-muted-foreground" />
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top">
+                                                        <p>Duplicate RFQ</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                         </TableCell>
                                     )}
                                 </TableRow>
