@@ -158,5 +158,8 @@
   "cancel_rfq_confirmation_body": "Diese Aktion kann nicht rückgängig gemacht werden. Die Anfrage wird als 'Storniert' markiert und ist nicht mehr aktiv.",
   "button_confirm_cancel": "Ja, Anfrage stornieren",
   "rfq_canceled_title": "Anfrage storniert",
-  "rfq_canceled_description": "Anfrage {rfqCode} wurde storniert."
+  "rfq_canceled_description": "Anfrage {rfqCode} wurde storniert.",
+  "button_copy_rfq": "Anfrage kopieren",
+  "rfq_copied": "Anfrage kopiert",
+  "rfq_copied_description": "Eine neue Anfrage wurde basierend auf dem Original erstellt."
 }

@@ -37,6 +37,9 @@ import { CustomerSidebar } from './components/customer-sidebar';
 import { ProductComments } from './components/product-comments';
 import type { ProductComment } from '@/lib/types';
 import { translateToAllLanguages, translateProductFields } from '@/lib/gemini';
+import { copyRfq } from '@/lib/copy-rfq';
+import { Copy } from 'lucide-react';
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const formatFirestoreDate = (date: any): string => {
@@ -423,6 +426,18 @@ export default function RFQDetailClient() {
         }
     };
 
+    const handleCopyRfq = async () => {
+        if (!rfq || !user) return;
+        try {
+            const newId = await copyRfq(rfq, user.id);
+            toast({ title: t('rfq_copied'), description: t('rfq_copied_description') });
+            router.push(`/dashboard/rfq/${newId}`);
+        } catch {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to copy RFQ.' });
+        }
+    };
+
+
     const handleCancelRfq = async () => {
         if (!rfq || !user) return;
         if (user.id !== rfq.creatorId && user.role !== 'Admin') return;
@@ -543,6 +558,14 @@ export default function RFQDetailClient() {
                         {rfq.status === 'Locked' ? <><Unlock className="h-4 w-4" />{t('button_unlock_rfq')}</> : <><Lock className="h-4 w-4" />{t('button_lock_rfq')}</>}
                     </Button>
                 )}
+
+                {/* Copy RFQ */}
+                    {user?.role === 'Sales' && (
+                        <Button variant="outline" onClick={handleCopyRfq} className="flex items-center gap-2">
+                            <Copy className="h-4 w-4" />
+                            {t('button_copy_rfq')}
+                        </Button>
+                    )}
 
                 {/* Edit */}
                 {user?.role === 'Sales' && user.id === rfq.creatorId && rfq.status === 'Waiting for Quote' && (

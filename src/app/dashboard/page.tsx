@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { copyRfq } from '@/lib/copy-rfq';
+import { Copy } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // All helper components are at module level so their internal useState hooks
@@ -178,6 +180,7 @@ type RFQTableProps = {
     getCreatorName: (id: string) => string;
     t: (key: string, params?: any) => string;
     router: ReturnType<typeof useRouter>;
+    onCopyRfq?: (rfq: RFQ) => void;
 };
 
 const RFQTable = ({
@@ -186,6 +189,7 @@ const RFQTable = ({
     handlePageChange, handleItemsPerPageChange,
     jumpToPage, setJumpToPage, handleJumpToPage,
     formatFirestoreDate, getStatusVariant, getCreatorName, t, router,
+    onCopyRfq,
 }: RFQTableProps) => {
     const totalPages = Math.ceil(data.length / itemsPerPage);
     const start = (currentPage - 1) * itemsPerPage;
@@ -496,6 +500,19 @@ const RFQTable = ({
                                     <TableCell className="text-right">
                                         <Checkbox checked={rfq.status === 'Sent'} disabled aria-label="Sent status" />
                                     </TableCell>
+                                    {onCopyRfq && (
+                                        <TableCell>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => onCopyRfq(rfq)}
+                                                className="h-7 px-2 text-xs"
+                                            >
+                                                <Copy className="h-3.5 w-3.5 mr-1" />
+                                                {t('button_copy_rfq')}
+                                            </Button>
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                             );
                         })
@@ -662,6 +679,17 @@ export default function DashboardPage() {
         }
     };
 
+    const handleCopyRfq = async (rfq: RFQ) => {
+        if (!user || user.role !== 'Sales') return;
+        try {
+            const newId = await copyRfq(rfq, user.id);
+            toast({ title: t('rfq_copied'), description: t('rfq_copied_description') });
+            router.push(`/dashboard/rfq/${newId}`);
+        } catch {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to copy RFQ.' });
+        }
+    };
+
     const handlePageChange = useCallback((page: number, total: number) => {
         if (page >= 1 && page <= total) setCurrentPage(page);
     }, []);
@@ -753,12 +781,24 @@ export default function DashboardPage() {
         rfq.assignedPurchaserIds?.includes(user?.id || '') && rfq.status !== 'Quotation Completed'
     ));
 
+    const handleCopyRfq = async (rfq: RFQ) => {
+        if (!user || user.role !== 'Sales') return;
+        try {
+            const newId = await copyRfq(rfq, user.id);
+            toast({ title: t('rfq_copied'), description: t('rfq_copied_description') });
+            router.push(`/dashboard/rfq/${newId}`);
+        } catch {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to copy RFQ.' });
+        }
+    };
+
     const tableProps = {
         allUsers, filters, hasActiveFilters, currentPage, itemsPerPage,
         updateFilter, clearFilter, clearAllFilters,
         handlePageChange, handleItemsPerPageChange,
         jumpToPage, setJumpToPage, handleJumpToPage,
         formatFirestoreDate, getStatusVariant, getCreatorName, t, router,
+        onCopyRfq: user?.role === 'Sales' ? handleCopyRfq : undefined,
     };
 
     if (loading) {
@@ -781,7 +821,9 @@ export default function DashboardPage() {
                         <PlusCircle className="mr-2 h-4 w-4" />
                         {t('button_create_new_rfq')}
                     </Button>
+                    
                 )}
+
             </div>
 
             {user?.role === 'Sales' && purchasingUsers.length === 0 && (

@@ -210,5 +210,8 @@
   "notification_new_comment_title": "新留言",
   "notification_new_comment_body": "{authorName} 在询价单 {rfqCode} 的产品 {productName} 中留言。",
   "original": "原文",
-  "show_original": "显示原文"
+  "show_original": "显示原文",
+  "button_copy_rfq": "复制询价单",
+  "rfq_copied": "询价单已复制",
+  "rfq_copied_description": "已基于原询价单创建新的询价单。"
 }

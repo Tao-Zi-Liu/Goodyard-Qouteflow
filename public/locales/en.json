@@ -210,5 +210,8 @@
   "notification_new_comment_title": "New Comment",
   "notification_new_comment_body": "{authorName} left a comment on product {productName} in RFQ {rfqCode}.",
   "original": "Original",
-  "show_original": "Show original"
+  "show_original": "Show original",
+  "button_copy_rfq": "Copy RFQ",
+  "rfq_copied": "RFQ Copied",
+  "rfq_copied_description": "A new RFQ has been created based on the original."
 }

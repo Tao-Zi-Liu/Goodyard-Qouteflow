@@ -1,4 +1,4 @@
-// src/app/login/page.tsx - Final Clean Version
+// src/app/login/page.tsx
 "use client";
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,8 +22,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    
+
     if (!email || !password) {
       toast({
         variant: "destructive",
@@ -37,48 +36,52 @@ export default function LoginPage() {
     try {
       const success = await login(email, password);
 
-        if (success) {
-            toast({
-                title: "Login Successful",
-                description: "Welcome back!",
-            });
-            router.push('/dashboard');
-        } else {
-            toast({
-                variant: "destructive",
-                title: "Login Failed",
-                description: "Invalid email or password. Please check your credentials.",
-            });
-        }
-      } catch (error: any) {
-        console.error('Caught error:', error);
-        if (error?.message === 'ACCOUNT_DISABLED') {
-            toast({
-                variant: "destructive",
-                title: "账号已停用",
-                description: "该账号已经停用，请联系管理员！",
-            });
-        } else {
-            toast({
-                variant: "destructive",
-                title: "Login Failed",
-                description: "Invalid email or password. Please check your credentials.",
-            });
-        }
+      if (success) {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
+        router.push('/dashboard');
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: "Invalid email or password. Please check your credentials.",
+        });
+      }
+    } catch (error: any) {
+      console.error('Caught error:', error);
+      if (error?.message === 'ACCOUNT_DISABLED') {
+        toast({
+          variant: "destructive",
+          title: "账号已停用",
+          description: "该账号已经停用，请联系管理员！",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: "Invalid email or password. Please check your credentials.",
+        });
+      }
+    } finally {
+      // ✅ 修复：无论登录成功、失败、还是异常，都立即重置 loading 状态
+      // 原来失败时没有 setIsLoading(false)，导致关掉弹窗后页面仍持续 loading
+      setIsLoading(false);
     }
-};
+  };
 
   if (!isLoaded) {
-     return <div className="flex h-screen w-full items-center justify-center bg-background"></div>;
+    return <div className="flex h-screen w-full items-center justify-center bg-background"></div>;
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm shadow-2xl">
         <CardHeader className="text-center">
-            <div className="mx-auto bg-primary text-primary-foreground rounded-full p-3 w-fit mb-4">
-              <Workflow className="h-8 w-8" />
-            </div>
+          <div className="mx-auto bg-primary text-primary-foreground rounded-full p-3 w-fit mb-4">
+            <Workflow className="h-8 w-8" />
+          </div>
           <CardTitle className="text-2xl font-bold">{t('app_title')}</CardTitle>
           <CardDescription>{t('login_title')}</CardDescription>
         </CardHeader>
@@ -103,11 +106,11 @@ export default function LoginPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-                 <div className="relative">
+                <div className="relative">
                   <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="password" 
-                    type="password" 
+                  <Input
+                    id="password"
+                    type="password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -115,13 +118,16 @@ export default function LoginPage() {
                     className="pl-10"
                     disabled={isLoading}
                   />
-                 </div>
+                </div>
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent"></div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    Signing in...
+                  </div>
                 ) : (
-                  t('login_button')
+                  t('login_button') || 'Sign In'
                 )}
               </Button>
             </div>
