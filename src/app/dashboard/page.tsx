@@ -404,7 +404,7 @@ const RFQTable = ({
                         </TableHead>
 
                         {/* Sent */}
-                        <TableHead className="text-right">
+                        <TableHead>
                             <ColumnFilterHeader label={t('header_sent')} isActive={!!filters.sent}>
                                 <Select value={filters.sent || 'all'} onValueChange={v => updateFilter('sent', v === 'all' ? '' : v)}>
                                     <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('all')} /></SelectTrigger>
@@ -501,16 +501,14 @@ const RFQTable = ({
                                         <Checkbox checked={rfq.status === 'Sent'} disabled aria-label="Sent status" />
                                     </TableCell>
                                     {onCopyRfq && (
-                                        <TableCell>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
+                                        <TableCell className="text-right">
+                                            <button
+                                                title="Duplicate RFQ"
                                                 onClick={() => onCopyRfq(rfq)}
-                                                className="h-7 px-2 text-xs"
+                                                className="p-1.5 rounded hover:bg-muted transition-colors"
                                             >
-                                                <Copy className="h-3.5 w-3.5 mr-1" />
-                                                {t('button_copy_rfq')}
-                                            </Button>
+                                                <Copy className="h-4 w-4 text-muted-foreground" />
+                                            </button>
                                         </TableCell>
                                     )}
                                 </TableRow>
