@@ -679,17 +679,6 @@ export default function DashboardPage() {
         }
     };
 
-    const handleCopyRfq = async (rfq: RFQ) => {
-        if (!user || user.role !== 'Sales') return;
-        try {
-            const newId = await copyRfq(rfq, user.id);
-            toast({ title: t('rfq_copied'), description: t('rfq_copied_description') });
-            router.push(`/dashboard/rfq/${newId}`);
-        } catch {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to copy RFQ.' });
-        }
-    };
-
     const handlePageChange = useCallback((page: number, total: number) => {
         if (page >= 1 && page <= total) setCurrentPage(page);
     }, []);
