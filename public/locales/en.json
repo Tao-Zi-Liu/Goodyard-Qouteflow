@@ -228,5 +228,8 @@
   "dashboard_unassigned_tab": "Unassigned",
   "dashboard_all_rfqs_tab_om": "All RFQs",
   "purchaser_already_quoted": "Already quoted",
-  "reassign_not_allowed": "Cannot remove purchasers who have already submitted quotes."
+  "reassign_not_allowed": "Cannot remove purchasers who have already submitted quotes.",
+  "inquiries_title": "Inquiries",
+  "button_edit_rfq": "Edit RFQ" ,
+  "button_cancel_edit": "Cancel Edit"
 }

@@ -571,7 +571,7 @@ export default function RFQDetailClient() {
                 {user?.role === 'Sales' && user.id === rfq.creatorId && rfq.status === 'Waiting for Quote' && (
                     <Button variant="outline" onClick={() => setIsEditing(!isEditing)} className="flex items-center gap-2">
                         <Edit className="h-4 w-4" />
-                        {isEditing ? 'Cancel Edit' : 'Edit RFQ'}
+                        {isEditing ? t('button_cancel_edit') : t('button_edit_rfq')}
                     </Button>
                 )}
 

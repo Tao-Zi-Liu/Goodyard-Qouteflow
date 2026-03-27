@@ -228,5 +228,8 @@
   "dashboard_unassigned_tab": "待分配",
   "dashboard_all_rfqs_tab_om": "全部询价单",
   "purchaser_already_quoted": "已报价",
-  "reassign_not_allowed": "无法移除已提交报价的报价人。"
+  "reassign_not_allowed": "无法移除已提交报价的报价人。",
+  "inquiries_title": "询价单",
+  "button_edit_rfq": "编辑询价单",
+  "button_cancel_edit": "取消编辑"
 }

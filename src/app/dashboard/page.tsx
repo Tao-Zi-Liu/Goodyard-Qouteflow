@@ -475,7 +475,7 @@ const RFQTable = ({
                                             })()}
                                         </div>
                                     </TableCell>
-                                    <TableCell>{rfq.customerType || t('value_default')}</TableCell>
+                                    <TableCell>{rfq.customerType ? t(`customer_type_${rfq.customerType.toLowerCase()}`) : t('value_default')}</TableCell>
                                     <TableCell>{rfq.customerEmail || t('value_default')}</TableCell>
                                     <TableCell>{firstProduct?.sku || t('value_default')}</TableCell>
                                     <TableCell>{firstProduct?.color || t('value_default')}</TableCell>
@@ -811,7 +811,7 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">{t('dashboard_title') === '仪表盘' ? 'Inquiries' : t('dashboard_title')}</h1>
+                <h1 className="text-3xl font-bold tracking-tight">{t('inquiries_title')}</h1>
                     <p className="text-muted-foreground">{t('inquiries_subtitle')}</p>
                 </div>
                 {user?.role === 'Sales' && (

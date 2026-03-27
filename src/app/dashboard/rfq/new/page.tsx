@@ -456,7 +456,7 @@ function AiExtractDialog({ onApply }: { onApply: (data: any) => void }) {
                     onChange={(e) => setText(e.target.value)}
                 />
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                    <Button variant="outline" onClick={() => setIsOpen(false)}>{t('cancel')}</Button>
                     <Button onClick={handleExtract} disabled={isLoading}>
                         {isLoading ? "Extracting..." : "Extract and Apply"}
                     </Button>
@@ -857,7 +857,7 @@ const handleSave = async () => {
                     onClick={() => {
                         const errors = form.formState.errors;
                     }}
-                >Create RFQ</Button>
+                    >{t('create_new_rfq_title')}</Button>
             </div>
           </form>
         </Form>
