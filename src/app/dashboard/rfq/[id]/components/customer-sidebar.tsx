@@ -34,7 +34,7 @@ export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, edit
                             <div>
                                 <h4 className="font-semibold text-sm">{t('customer')}</h4>
                                 <p className="text-sm text-muted-foreground">{rfq.customerEmail}</p>
-                                <Badge variant="outline" className="mt-1">{rfq.customerType}</Badge>
+                                <Badge variant="outline" className="mt-1">{rfq.customerType ? t(`customer_type_${rfq.customerType.toLowerCase()}`) : ''}</Badge>
                             </div>
                             <Separator />
                             {creator && (
@@ -45,7 +45,7 @@ export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, edit
                                     </Avatar>
                                     <div>
                                         <p className="font-semibold text-sm">{creator.name}</p>
-                                        <p className="text-xs text-muted-foreground">{creator.role}</p>
+                                        <p className="text-xs text-muted-foreground">{t(`user_role_${creator.role.toLowerCase().replace(' ', '_')}`)}</p>
                                     </div>
                                 </div>
                             )}
@@ -58,7 +58,7 @@ export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, edit
                                     name="customerEmail"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Customer Email</FormLabel>
+                                            <FormLabel>{t('customer_email_label')}</FormLabel>
                                             <FormControl>
                                                 <Input type="email" {...field} />
                                             </FormControl>
@@ -71,14 +71,14 @@ export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, edit
                                     name="customerType"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Customer Type</FormLabel>
+                                            <FormLabel>{t('customer_type_label')}</FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                                 </FormControl>
                                                 <SelectContent>
-                                                    <SelectItem value="New">New</SelectItem>
-                                                    <SelectItem value="Repeating">Repeating</SelectItem>
+                                                <SelectItem value="New">{t('customer_type_new')}</SelectItem>
+                                                <SelectItem value="Repeating">{t('customer_type_repeating')}</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />
@@ -121,7 +121,7 @@ export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, edit
                                 name="assignedPurchaserIds"
                                 render={() => (
                                     <FormItem>
-                                        <FormLabel>Select Purchasers</FormLabel>
+                                        <FormLabel>{t('select_purchasers')}</FormLabel>
                                         <div className="space-y-2">
                                             {purchasingUsers.map((pUser) => (
                                                 <FormField

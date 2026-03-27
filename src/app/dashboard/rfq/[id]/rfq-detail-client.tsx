@@ -698,10 +698,10 @@ export default function RFQDetailClient() {
                             products: rfq.products.map(p => ({ ...p, imageFiles: [] }))
                         });
                     }}>
-                        Cancel
+                        {t('cancel')}
                     </Button>
                     <Button onClick={handleSaveRfq}>
-                        <Save className="mr-2 h-4 w-4" /> Save Changes
+                    <Save className="mr-2 h-4 w-4" /> {t('button_save_changes')}
                     </Button>
                 </div>
             )}

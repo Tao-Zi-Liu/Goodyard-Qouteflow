@@ -39,7 +39,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.productSeries`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Product Series</FormLabel>
+                                            <FormLabel>{t('field_product_series_label')}</FormLabel>
                                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -59,7 +59,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.sku`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>SKU</FormLabel>
+                                            <FormLabel>{t('field_sku')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -73,7 +73,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.quantity`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Quantity</FormLabel>
+                                            <FormLabel>{t('field_quantity_label')}</FormLabel>
                                             <FormControl>
                                                 <Input
                                                     type="number"
@@ -91,7 +91,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.hairFiber`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Hair Fiber</FormLabel>
+                                            <FormLabel>{t('field_hair_fiber')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -105,7 +105,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.cap`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Cap</FormLabel>
+                                            <FormLabel>{t('field_cap')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -116,7 +116,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.capSize`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Cap Size</FormLabel>
+                                            <FormLabel>{t('field_cap_size')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -130,7 +130,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.length`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Length</FormLabel>
+                                            <FormLabel>{t('field_length')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -141,7 +141,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.density`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Density</FormLabel>
+                                            <FormLabel>{t('field_density')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -155,7 +155,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.color`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Color</FormLabel>
+                                            <FormLabel>{t('field_color')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
@@ -166,7 +166,7 @@ export function ProductEditForm({
                                     name={`products.${productIndex}.curlStyle`}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Curl Style</FormLabel>
+                                            <FormLabel>{t('field_curl_style')}</FormLabel>
                                             <FormControl><Input {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>

@@ -231,5 +231,6 @@
   "reassign_not_allowed": "Cannot remove purchasers who have already submitted quotes.",
   "inquiries_title": "Inquiries",
   "button_edit_rfq": "Edit RFQ" ,
-  "button_cancel_edit": "Cancel Edit"
+  "button_cancel_edit": "Cancel Edit",
+  "button_save_changes": "Save Changes"
 }
