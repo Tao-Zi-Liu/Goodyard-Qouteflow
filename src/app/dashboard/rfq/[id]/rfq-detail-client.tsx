@@ -687,7 +687,7 @@ export default function RFQDetailClient() {
 
             {/* Save/Cancel bar */}
             {isEditing && (
-                <div className="flex justify-end gap-2 mt-6 border-t pt-6">
+                <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-end gap-2 px-6 py-4 bg-background/95 backdrop-blur border-t shadow-lg">
                     <Button variant="outline" onClick={() => {
                         setIsEditing(false);
                         setEditingImages({});
