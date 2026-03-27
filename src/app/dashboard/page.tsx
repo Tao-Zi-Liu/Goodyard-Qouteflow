@@ -447,7 +447,7 @@ const RFQTable = ({
                                     <TableCell>
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2">
-                                                <Badge variant={getStatusVariant(rfq.status)}>
+                                                <Badge variant={getStatusVariant(rfq.status)} className="whitespace-nowrap">
                                                     {t(`status_${rfq.status.toLowerCase().replace(/ /g, '_')}`)}
                                                 </Badge>
                                                 {isLocked && rfq.lockedBy && (
