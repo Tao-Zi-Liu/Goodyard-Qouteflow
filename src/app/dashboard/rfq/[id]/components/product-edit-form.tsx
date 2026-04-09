@@ -173,6 +173,56 @@ export function ProductEditForm({
                                     )}
                                 />
                             </div>
+                        
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    control={editForm.control}
+                                    name={`products.${productIndex}.hairTexture`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Hair Texture</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={editForm.control}
+                                    name={`products.${productIndex}.hairPart`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Hair Part</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                    control={editForm.control}
+                                    name={`products.${productIndex}.layers`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Layers</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={editForm.control}
+                                    name={`products.${productIndex}.hairBangs`}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Hair Bangs</FormLabel>
+                                            <FormControl><Input {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </div>
 
                             {/* Image Upload */}
                             <div className="space-y-4">
