@@ -639,6 +639,10 @@ const handleSave = async () => {
         density: product.density,
         color: product.color,
         curlStyle: product.curlStyle,
+        hairTexture: product.hairTexture || '',
+        hairPart: product.hairPart || '',
+        layers: product.layers || '',
+        hairBangs: product.hairBangs || '',
         specialNotes: product.specialNotes || '',
         quantity: product.quantity || 1,
         images: imageUrls // Only include the uploaded URLs, not File objects
@@ -910,7 +914,12 @@ const handleSave = async () => {
                             <div><span className="font-medium text-muted-foreground">Length:</span> {product.length}</div>
                             <div><span className="font-medium text-muted-foreground">Density:</span> {product.density}</div>
                             <div><span className="font-medium text-muted-foreground">Color:</span> {product.color}</div>
-                            <div><span className="font-medium text-muted-foreground">Hair Texture:</span> {product.curlStyle}</div>
+                            <div><span className="font-medium text-muted-foreground">Hair Texture:</span> {product.hairTexture}</div>
+                            <div><span className="font-medium text-muted-foreground">Hair Part:</span> {product.hairPart}</div>
+                            <div><span className="font-medium text-muted-foreground">Layers:</span> {product.layers}</div>
+                            <div><span className="font-medium text-muted-foreground">Hair Bangs:</span> {product.hairBangs}</div>
+                            <div><span className="font-medium text-muted-foreground">Curl Style:</span> {product.curlStyle}</div>
+
                          </div>
                          {product.specialNotes && (
                         <div className="col-span-2">
