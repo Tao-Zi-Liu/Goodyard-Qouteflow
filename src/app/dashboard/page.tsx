@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -564,7 +565,7 @@ const RFQTable = ({
 // ─────────────────────────────────────────────────────────────────────────────
 // DashboardPage
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DashboardPage() {
+function DashboardContent() {
     const router = useRouter();
     const { user } = useAuth();
     const { t } = useI18n();
@@ -574,10 +575,27 @@ export default function DashboardPage() {
     const [purchasingUsers, setPurchasingUsers] = useState<User[]>([]);
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(20);
+    const searchParams = useSearchParams();
+    const [currentPage, setCurrentPage] = useState(() => parseInt(searchParams.get('page') || '1'));
+    const [itemsPerPage, setItemsPerPage] = useState(() => parseInt(searchParams.get('perPage') || '20'));
     const [jumpToPage, setJumpToPage] = useState('');
-    const [filters, setFilters] = useState<Filters>(emptyFilters);
+    const [filters, setFilters] = useState<Filters>(() => ({
+        code: searchParams.get('code') || '',
+        customerType: searchParams.get('customerType') || '',
+        customerEmail: searchParams.get('customerEmail') || '',
+        refSku: searchParams.get('refSku') || '',
+        color: searchParams.get('color') || '',
+        length: searchParams.get('length') || '',
+        salePriceMin: searchParams.get('salePriceMin') || '',
+        salePriceMax: searchParams.get('salePriceMax') || '',
+        inquiryFrom: searchParams.get('inquiryFrom') || '',
+        inquiryTo: searchParams.get('inquiryTo') || '',
+        lastUpdatedFrom: searchParams.get('lastUpdatedFrom') || '',
+        lastUpdatedTo: searchParams.get('lastUpdatedTo') || '',
+        creatorId: searchParams.get('creatorId') || '',
+        sent: searchParams.get('sent') || '',
+        status: searchParams.get('status') || '',
+    }));
 
     const updateFilter = useCallback((key: keyof Filters, value: string) => {
         setFilters(prev => ({ ...prev, [key]: value }));
@@ -597,6 +615,15 @@ export default function DashboardPage() {
         setFilters(emptyFilters);
         setCurrentPage(1);
     }, []);
+
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (currentPage > 1) params.set('page', currentPage.toString());
+        if (itemsPerPage !== 20) params.set('perPage', itemsPerPage.toString());
+        Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+        const qs = params.toString();
+        router.replace(qs ? `?${qs}` : '/dashboard', { scroll: false });
+    }, [filters, currentPage, itemsPerPage]);
 
     const hasActiveFilters = Object.values(filters).some(v => v !== '');
 
@@ -913,5 +940,12 @@ export default function DashboardPage() {
                 </div>
             )}
         </div>
+    );
+}
+export default function DashboardPage() {
+    return (
+        <Suspense>
+            <DashboardContent />
+        </Suspense>
     );
 }
