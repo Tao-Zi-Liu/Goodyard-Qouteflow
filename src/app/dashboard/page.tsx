@@ -579,6 +579,12 @@ function DashboardContent() {
     const [currentPage, setCurrentPage] = useState(() => parseInt(searchParams.get('page') || '1'));
     const [itemsPerPage, setItemsPerPage] = useState(() => parseInt(searchParams.get('perPage') || '20'));
     const [jumpToPage, setJumpToPage] = useState('');
+    const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || (
+        user?.role === 'Sales' ? 'my_rfqs' :
+        user?.role === 'Purchasing' ? 'my_quotes' :
+        user?.role === 'Order Manager' ? 'unassigned' :
+        'all_rfqs'
+    ));
     const [filters, setFilters] = useState<Filters>(() => ({
         code: searchParams.get('code') || '',
         customerType: searchParams.get('customerType') || '',
@@ -620,10 +626,11 @@ function DashboardContent() {
         const params = new URLSearchParams();
         if (currentPage > 1) params.set('page', currentPage.toString());
         if (itemsPerPage !== 20) params.set('perPage', itemsPerPage.toString());
+        if (activeTab) params.set('tab', activeTab);
         Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
         const qs = params.toString();
         router.replace(qs ? `?${qs}` : '/dashboard', { scroll: false });
-    }, [filters, currentPage, itemsPerPage]);
+    }, [filters, currentPage, itemsPerPage, activeTab]);
 
     const hasActiveFilters = Object.values(filters).some(v => v !== '');
 
@@ -865,12 +872,7 @@ function DashboardContent() {
                 </Card>
             )}
 
-                <Tabs defaultValue={
-                    user?.role === 'Sales' ? 'my_rfqs' :
-                    user?.role === 'Purchasing' ? 'my_quotes' :
-                    user?.role === 'Order Manager' ? 'unassigned' :
-                    'all_rfqs'
-                }>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
                 {user?.role === 'Sales' && <TabsTrigger value="my_rfqs">{t('dashboard_my_rfqs_tab')}</TabsTrigger>}
                 {user?.role === 'Purchasing' && <TabsTrigger value="my_quotes">{t('dashboard_my_quotes_tab')}</TabsTrigger>}
