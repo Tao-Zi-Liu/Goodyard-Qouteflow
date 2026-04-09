@@ -20,7 +20,7 @@ export interface User {
   updatedAt?: string; // When the user was last updated
 }
 
-export type RFQStatus = 'Waiting for Assign' | 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed' | 'Sent' | 'Abandoned' | 'Closed' | 'Archived' | 'Canceled';
+export type RFQStatus = 'Waiting for Quote' | 'Locked' | 'Quotation in Progress' | 'Quotation Completed' | 'Sent' | 'Abandoned' | 'Closed' | 'Archived' | 'Canceled';
 export type ProductSeries = 'Synthetic Product' | 'Wig' | 'Hair Extension' | 'Topper' | 'Toupee' | 'Hair Patch';
 
 export interface Product {
