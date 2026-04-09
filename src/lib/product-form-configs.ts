@@ -32,9 +32,10 @@ export const PRODUCT_FORM_CONFIGS: Record<string, ProductFormConfig> = {
         { name: 'length', label: 'field_length', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
         { name: 'density', label: 'field_density', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
         { name: 'color', label: 'field_color', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'hairTexture', label: 'field_hair_texture', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
+        { name: 'hairPart', label: 'field_hair_part', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
         { name: 'layers', label: 'field_layers', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
         { name: 'hairBangs', label: 'field_hair_bangs', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
-        { name: 'curlStyle', label: 'field_curl_style', type: 'text', required: false, placeholder: 'No such parameter, please fill in /' },
         { name: 'specialNotes', label: 'field_special_notes', type: 'textarea', required: false, placeholder: 'Enter any special requirements or additional details...' }
       ],
     schema: z.object({})

@@ -260,7 +260,7 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
               {productData?.productSeries && (() => {
               const config = getProductFormConfig(productData.productSeries);
               if (config) {
-                return config.fields.map((fieldConfig: ProductFormField) => (
+                return config.fields.filter((fieldConfig: ProductFormField) => fieldConfig.name !== 'sku').map((fieldConfig: ProductFormField) => (
                   <FormField 
                     key={fieldConfig.name}
                     control={control} 
@@ -909,8 +909,8 @@ const handleSave = async () => {
                          <Separator />
                          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                             <div><span className="font-medium text-muted-foreground">Hair Fiber:</span> {product.hairFiber}</div>
-                            <div><span className="font-medium text-muted-foreground">Cap:</span> {product.cap}</div>
-                            <div><span className="font-medium text-muted-foreground">Cap Size:</span> {product.capSize}</div>
+                            <div><span className="font-medium text-muted-foreground">{product.productSeries === 'Wig' ? 'Cap Construction' : 'Base Construction'}:</span> {product.cap}</div>
+                            <div><span className="font-medium text-muted-foreground">{product.productSeries === 'Wig' ? 'Cap Size' : 'Base Size'}:</span> {product.capSize}</div>
                             <div><span className="font-medium text-muted-foreground">Length:</span> {product.length}</div>
                             <div><span className="font-medium text-muted-foreground">Density:</span> {product.density}</div>
                             <div><span className="font-medium text-muted-foreground">Color:</span> {product.color}</div>
@@ -918,8 +918,6 @@ const handleSave = async () => {
                             <div><span className="font-medium text-muted-foreground">Hair Part:</span> {product.hairPart}</div>
                             <div><span className="font-medium text-muted-foreground">Layers:</span> {product.layers}</div>
                             <div><span className="font-medium text-muted-foreground">Hair Bangs:</span> {product.hairBangs}</div>
-                            <div><span className="font-medium text-muted-foreground">Curl Style:</span> {product.curlStyle}</div>
-
                          </div>
                          {product.specialNotes && (
                         <div className="col-span-2">
