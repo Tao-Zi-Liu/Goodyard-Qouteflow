@@ -918,8 +918,6 @@ const handleSave = async () => {
                             <div><span className="font-medium text-muted-foreground">Hair Part:</span> {product.hairPart}</div>
                             <div><span className="font-medium text-muted-foreground">Layers:</span> {product.layers}</div>
                             <div><span className="font-medium text-muted-foreground">Hair Bangs:</span> {product.hairBangs}</div>
-                            <div><span className="font-medium text-muted-foreground">Curl Style:</span> {product.curlStyle}</div>
-
                          </div>
                          {product.specialNotes && (
                         <div className="col-span-2">

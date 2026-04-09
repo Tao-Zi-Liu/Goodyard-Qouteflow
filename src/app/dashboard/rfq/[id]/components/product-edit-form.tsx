@@ -161,17 +161,6 @@ export function ProductEditForm({
                                         </FormItem>
                                     )}
                                 />
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.curlStyle`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t('field_curl_style')}</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
                             </div>
                         
                             <div className="grid grid-cols-2 gap-4">
