@@ -909,8 +909,8 @@ const handleSave = async () => {
                          <Separator />
                          <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                             <div><span className="font-medium text-muted-foreground">Hair Fiber:</span> {product.hairFiber}</div>
-                            <div><span className="font-medium text-muted-foreground">Cap:</span> {product.cap}</div>
-                            <div><span className="font-medium text-muted-foreground">Cap Size:</span> {product.capSize}</div>
+                            <div><span className="font-medium text-muted-foreground">{product.productSeries === 'Wig' ? 'Cap Construction' : 'Base Construction'}:</span> {product.cap}</div>
+                            <div><span className="font-medium text-muted-foreground">{product.productSeries === 'Wig' ? 'Cap Size' : 'Base Size'}:</span> {product.capSize}</div>
                             <div><span className="font-medium text-muted-foreground">Length:</span> {product.length}</div>
                             <div><span className="font-medium text-muted-foreground">Density:</span> {product.density}</div>
                             <div><span className="font-medium text-muted-foreground">Color:</span> {product.color}</div>
