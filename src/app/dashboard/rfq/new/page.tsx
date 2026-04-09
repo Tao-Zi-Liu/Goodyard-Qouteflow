@@ -607,7 +607,7 @@ const handleSave = async () => {
           products: [], // Will update with image URLs
           inquiryTime: serverTimestamp(),
           creatorId: user.id,
-          status: 'Waiting for Assign',
+          status: 'Waiting for Quote',
           quotes: [],
           lastUpdatedTime: serverTimestamp(),
       };

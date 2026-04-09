@@ -258,7 +258,6 @@ const RFQTable = ({
                                     <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('all')} /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">{t('all')}</SelectItem>
-                                        <SelectItem value="Waiting for Assign">{t('status_waiting_for_assign')}</SelectItem>
                                         <SelectItem value="Waiting for Quote">{t('status_waiting_for_quote')}</SelectItem>
                                         <SelectItem value="Locked">{t('status_locked')}</SelectItem>
                                         <SelectItem value="Quotation in Progress">{t('status_quotation_in_progress')}</SelectItem>
@@ -722,7 +721,6 @@ export default function DashboardPage() {
     const getStatusVariant = useCallback((status: RFQStatus) => {
         switch (status) {
             case 'Waiting for Quote': return 'secondary';
-            case 'Waiting for Assign': return 'outline';
             case 'Locked': return 'destructive';
             case 'Quotation in Progress': return 'default';
             case 'Quotation Completed': return 'outline';
@@ -777,7 +775,6 @@ export default function DashboardPage() {
     const requiresMyQuote = applyFilters(rfqs.filter(rfq =>
         rfq.assignedPurchaserIds?.includes(user?.id || '') && rfq.status !== 'Quotation Completed'
     ));
-    const unassignedRfqs = applyFilters(rfqs.filter(r => r.status === 'Waiting for Assign'));
 
     const handleCopyRfq = async (rfq: RFQ) => {
         if (!user || user.role !== 'Sales') return;
