@@ -1,14 +1,17 @@
 "use client";
 
 import { Upload, X } from 'lucide-react';
+import { useWatch } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import type { RFQ } from './types';
 import type { EditingImages } from './types';
 import type { UseFormReturn } from 'react-hook-form';
+import { getProductFormConfig, type FormField as ProductFormField } from '@/lib/product-form-configs';
 
 interface ProductEditFormProps {
     rfq: RFQ;
@@ -18,6 +21,106 @@ interface ProductEditFormProps {
     onRemoveImage: (productIndex: number, imageIndex: number) => void;
     onRemoveNewImage: (productIndex: number, imageIndex: number) => void;
     t: (key: string, params?: any) => string;
+}
+
+function ProductFieldsRow({
+    productIndex,
+    editForm,
+    t,
+}: {
+    productIndex: number;
+    editForm: UseFormReturn<any>;
+    t: (key: string, params?: any) => string;
+}) {
+    const productSeries = useWatch({
+        control: editForm.control,
+        name: `products.${productIndex}.productSeries`,
+    });
+
+    const config = getProductFormConfig(productSeries);
+    if (!config) return null;
+
+    // 每两个字段一组，放入同一行
+    const fields = config.fields.filter((f: ProductFormField) => f.name !== 'sku');
+    const pairs: ProductFormField[][] = [];
+    const textareaFields: ProductFormField[] = [];
+
+    fields.forEach((f: ProductFormField) => {
+        if (f.type === 'textarea') {
+            textareaFields.push(f);
+        } else {
+            const lastPair = pairs[pairs.length - 1];
+            if (!lastPair || lastPair.length === 2) {
+                pairs.push([f]);
+            } else {
+                lastPair.push(f);
+            }
+        }
+    });
+
+    return (
+        <>
+            {pairs.map((pair, pairIndex) => (
+                <div key={pairIndex} className="grid grid-cols-2 gap-4">
+                    {pair.map((fieldConfig: ProductFormField) => (
+                        <FormField
+                            key={fieldConfig.name}
+                            control={editForm.control}
+                            name={`products.${productIndex}.${fieldConfig.name}` as any}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>
+                                        {fieldConfig.required && <span className="text-red-500 mr-1">*</span>}
+                                        {t(fieldConfig.label)}
+                                    </FormLabel>
+                                    <FormControl>
+                                        {fieldConfig.type === 'select' ? (
+                                            <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                <SelectTrigger><SelectValue placeholder={fieldConfig.placeholder} /></SelectTrigger>
+                                                <SelectContent>
+                                                    {fieldConfig.options?.map((opt: string) => (
+                                                        <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        ) : (
+                                            <Input
+                                                {...field}
+                                                value={field.value || ''}
+                                                placeholder={fieldConfig.placeholder}
+                                            />
+                                        )}
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    ))}
+                </div>
+            ))}
+            {textareaFields.map((fieldConfig: ProductFormField) => (
+                <FormField
+                    key={fieldConfig.name}
+                    control={editForm.control}
+                    name={`products.${productIndex}.${fieldConfig.name}` as any}
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>{t(fieldConfig.label)}</FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    {...field}
+                                    value={field.value || ''}
+                                    placeholder={fieldConfig.placeholder}
+                                    rows={4}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            ))}
+        </>
+    );
 }
 
 export function ProductEditForm({
@@ -33,6 +136,8 @@ export function ProductEditForm({
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
+
+                            {/* Product Series & SKU */}
                             <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                     control={editForm.control}
@@ -40,7 +145,7 @@ export function ProductEditForm({
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>{t('field_product_series_label')}</FormLabel>
-                                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                            <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl>
                                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                                 </FormControl>
@@ -67,6 +172,7 @@ export function ProductEditForm({
                                 />
                             </div>
 
+                            {/* Quantity */}
                             <div className="grid grid-cols-2 gap-4">
                                 <FormField
                                     control={editForm.control}
@@ -86,132 +192,15 @@ export function ProductEditForm({
                                         </FormItem>
                                     )}
                                 />
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.hairFiber`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t('field_hair_fiber')}</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                <div />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.cap`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t('field_cap')}</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.capSize`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t('field_cap_size')}</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.length`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t('field_length')}</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.density`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t('field_density')}</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.color`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>{t('field_color')}</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-                        
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.hairTexture`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Hair Texture</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.hairPart`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Hair Part</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.layers`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Layers</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                                <FormField
-                                    control={editForm.control}
-                                    name={`products.${productIndex}.hairBangs`}
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Hair Bangs</FormLabel>
-                                            <FormControl><Input {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </div>
+                            {/* Dynamic fields based on product series */}
+                            <ProductFieldsRow
+                                productIndex={productIndex}
+                                editForm={editForm}
+                                t={t}
+                            />
 
                             {/* Image Upload */}
                             <div className="space-y-4">
@@ -289,6 +278,7 @@ export function ProductEditForm({
                                     </div>
                                 </div>
                             </div>
+
                         </div>
                     </CardContent>
                 </Card>
