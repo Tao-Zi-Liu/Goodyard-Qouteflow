@@ -260,7 +260,7 @@ const uploadImages = async (files: File[], rfqId: string, productId: string): Pr
               {productData?.productSeries && (() => {
               const config = getProductFormConfig(productData.productSeries);
               if (config) {
-                return config.fields.map((fieldConfig: ProductFormField) => (
+                return config.fields.filter((fieldConfig: ProductFormField) => fieldConfig.name !== 'sku').map((fieldConfig: ProductFormField) => (
                   <FormField 
                     key={fieldConfig.name}
                     control={control} 
