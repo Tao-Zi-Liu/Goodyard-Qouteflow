@@ -478,8 +478,16 @@ const RFQTable = ({
                                     <TableCell>{rfq.customerType ? t(`customer_type_${rfq.customerType.toLowerCase()}`) : t('value_default')}</TableCell>
                                     <TableCell>{rfq.customerEmail || t('value_default')}</TableCell>
                                     <TableCell>{firstProduct?.sku || t('value_default')}</TableCell>
-                                    <TableCell>{firstProduct?.color || t('value_default')}</TableCell>
-                                    <TableCell>{firstProduct?.length || t('value_default')}</TableCell>
+                                    <TableCell>
+                                        <span className="block max-w-[120px] truncate" title={firstProduct?.color || ''}>
+                                            {firstProduct?.color || t('value_default')}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        <span className="block max-w-[80px] truncate" title={firstProduct?.length || ''}>
+                                            {firstProduct?.length || t('value_default')}
+                                        </span>
+                                    </TableCell>
                                     <TableCell>
                                         {rfq.quotes && rfq.quotes.length > 0 ? (
                                             <div className="grid gap-1">
