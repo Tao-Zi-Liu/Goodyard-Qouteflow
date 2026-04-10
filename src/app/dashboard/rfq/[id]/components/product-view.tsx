@@ -28,10 +28,6 @@ export function ProductView({ product, onImageClick, t, language = 'en', product
     const nonTextareaFields = fields.filter(f => f.type !== 'textarea');
     const textareaFields = fields.filter(f => f.type === 'textarea');
 
-    const pairs: typeof nonTextareaFields[] = [];
-    for (let i = 0; i < nonTextareaFields.length; i += 2) {
-        pairs.push(nonTextareaFields.slice(i, i + 2));
-    }
 
     // 获取某字段的译文，若与原文相同或不存在则返回 null
     const getTranslation = (fieldName: string, originalValue: string): string | null => {
@@ -96,26 +92,24 @@ export function ProductView({ product, onImageClick, t, language = 'en', product
                     </div>
                 </div>
 
-                {/* Dynamic fields in pairs */}
-                {pairs.map((pair, pairIndex) => (
-                    <div key={pairIndex} className="grid grid-cols-2 gap-x-8">
-                        {pair.map((fieldConfig) => {
-                            const fieldValue = (product as any)[fieldConfig.name];
-                            const translation = fieldValue ? getTranslation(fieldConfig.name, fieldValue) : null;
-                            return (
-                                <div key={fieldConfig.name}>
-                                    <span className="text-muted-foreground">{t(fieldConfig.label)}:</span>
-                                    <p className="font-medium">{fieldValue || t('value_default')}</p>
-                                    {translation && (
-                                        <p className="text-xs text-muted-foreground italic mt-0.5 bg-muted/60 rounded px-2 py-0.5">
-                                            {translation}
-                                        </p>
-                                    )}
+                {/* Dynamic fields — unified 2-col grid, each field is an independent cell */}
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                                    {nonTextareaFields.map((fieldConfig) => {
+                                        const fieldValue = (product as any)[fieldConfig.name];
+                                        const translation = fieldValue ? getTranslation(fieldConfig.name, fieldValue) : null;
+                                        return (
+                                            <div key={fieldConfig.name} className="min-w-0">
+                                                <span className="text-muted-foreground">{t(fieldConfig.label)}:</span>
+                                                <p className="font-medium break-words">{fieldValue || t('value_default')}</p>
+                                                {translation && (
+                                                    <p className="text-xs text-muted-foreground italic mt-0.5 bg-muted/60 rounded px-2 py-0.5 break-words">
+                                                        {translation}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                            );
-                        })}
-                    </div>
-                ))}
 
                 {/* Textarea fields (e.g. Special Notes) */}
                 {textareaFields.map((fieldConfig) => {
