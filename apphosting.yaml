@@ -6,7 +6,7 @@ runConfig:
 
 env:
   - variable: NEXT_PUBLIC_FIREBASE_DATABASE_ID
-    value: (default)
+    value: staging
     availability:
       - BUILD
   - variable: GOOGLE_GENAI_API_KEY
