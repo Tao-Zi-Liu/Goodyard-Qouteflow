@@ -18,7 +18,7 @@ interface QuoteDialogProps {
   children: React.ReactNode;
   product: Product;
   userQuote?: Quote;
-  onQuoteSubmit: (productId: string, price: number, deliveryDate: Date, message: string, existingQuote?: Quote) => Promise<void>;
+  onQuoteSubmit: (productId: string, price: number, deliveryDateFrom: Date | undefined, deliveryDateTo: Date | undefined, message: string, existingQuote?: Quote) => Promise<void>;
 }
 
 export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: QuoteDialogProps) {
@@ -26,19 +26,24 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
   const [price, setPrice] = useState(
     userQuote?.salesCostPriceRMB?.toString() || userQuote?.price?.toString() || ''
   );
-  const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(
-    userQuote?.deliveryDate ? new Date(userQuote.deliveryDate) : undefined
+  const [deliveryDateFrom, setDeliveryDateFrom] = useState<Date | undefined>(
+    userQuote?.deliveryDateFrom ? new Date(userQuote.deliveryDateFrom) : undefined
+  );
+  const [deliveryDateTo, setDeliveryDateTo] = useState<Date | undefined>(
+    userQuote?.deliveryDateTo ? new Date(userQuote.deliveryDateTo) : undefined
   );
   const [message, setMessage] = useState(userQuote?.notes || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { t } = useI18n();
 
+  const isValid = price && (deliveryDateFrom || deliveryDateTo);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!price || !deliveryDate) return;
+    if (!isValid) return;
     setIsSubmitting(true);
     try {
-      await onQuoteSubmit(product.id, Number(price), deliveryDate, message, userQuote);
+      await onQuoteSubmit(product.id, Number(price), deliveryDateFrom, deliveryDateTo, message, userQuote);
       setOpen(false);
     } catch (error) {
       console.error('Error submitting quote:', error);
@@ -49,7 +54,8 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
 
   const resetForm = () => {
     setPrice(userQuote?.salesCostPriceRMB?.toString() || userQuote?.price?.toString() || '');
-    setDeliveryDate(userQuote?.deliveryDate ? new Date(userQuote.deliveryDate) : undefined);
+    setDeliveryDateFrom(userQuote?.deliveryDateFrom ? new Date(userQuote.deliveryDateFrom) : undefined);
+    setDeliveryDateTo(userQuote?.deliveryDateTo ? new Date(userQuote.deliveryDateTo) : undefined);
     setMessage(userQuote?.notes || '');
   };
 
@@ -76,6 +82,8 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+
+            {/* Price */}
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">
                 {t('price_rmb')}
@@ -113,27 +121,31 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
               </div>
             </div>
 
+            {/* Earliest Delivery Date */}
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">{t('delivery_date')}</Label>
+              <Label className="text-right text-sm leading-tight">
+                {t('delivery_date_from')}
+              </Label>
               <div className="col-span-3">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
+                      type="button"
                       variant="outline"
                       className={cn(
                         "w-full justify-start text-left font-normal",
-                        !deliveryDate && "text-muted-foreground"
+                        !deliveryDateFrom && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {deliveryDate ? format(deliveryDate, "PPP") : <span>{t('pick_date')}</span>}
+                      {deliveryDateFrom ? format(deliveryDateFrom, "PPP") : <span>{t('pick_date')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
                       mode="single"
-                      selected={deliveryDate}
-                      onSelect={setDeliveryDate}
+                      selected={deliveryDateFrom}
+                      onSelect={setDeliveryDateFrom}
                       disabled={(date) => date < new Date()}
                       initialFocus
                     />
@@ -142,6 +154,43 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
               </div>
             </div>
 
+            {/* Latest Delivery Date */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right text-sm leading-tight">
+                {t('delivery_date_to')}
+              </Label>
+              <div className="col-span-3">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !deliveryDateTo && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {deliveryDateTo ? format(deliveryDateTo, "PPP") : <span>{t('pick_date')}</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={deliveryDateTo}
+                      onSelect={setDeliveryDateTo}
+                      disabled={(date) => date < new Date() || (deliveryDateFrom ? date < deliveryDateFrom : false)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {!deliveryDateFrom && !deliveryDateTo && (
+                  <p className="text-xs text-destructive mt-1">{t('delivery_date_required')}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Message */}
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="message" className="text-right pt-2">
                 {t('message')}
@@ -166,7 +215,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               {t('cancel')}
             </Button>
-            <Button type="submit" disabled={isSubmitting || !price || !deliveryDate}>
+            <Button type="submit" disabled={isSubmitting || !isValid}>
               {isSubmitting ? t('submitting') : (userQuote ? t('update_quote') : t('submit_quote_rmb'))}
             </Button>
           </DialogFooter>

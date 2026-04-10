@@ -10,6 +10,8 @@ export interface Quote {
     customizedProductPriceUSD: number; // (RMB ÷ 2.7 + 40) × 1.075
     
     deliveryDate: string;
+    deliveryDateFrom?: string; 
+    deliveryDateTo?: string;
     quoteTime: string;
     status: 'Pending Acceptance' | 'Accepted' | 'Rejected' | 'Abandoned';
     notes?: string;
