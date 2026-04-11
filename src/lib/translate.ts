@@ -7,6 +7,22 @@ export interface TranslateResponse {
   detectedSourceLanguage?: string;
 }
 
+const HAIR_FIBER_GLOSSARY_ZH: Record<string, string> = {
+  'burmese': '缅甸发',
+  'chinese': '中国发',
+  'indian': '印度发',
+  'european': '欧洲发',
+  'vietnamese': '越南发',
+  'brazilian': '巴西发',
+  'mongolian': '蒙古发',
+  'cambodian': '柬埔寨发',
+  'remy human hair': '瑞米真发',
+  'virgin human hair': '原始真发',
+  'human hair': '真发',
+  'synthetic fiber': '合成纤维',
+  'heat friendly synthetic': '耐热合成纤维',
+};
+
 export async function translateText(
   text: string,
   targetLanguage: string,
@@ -16,8 +32,13 @@ export async function translateText(
     throw new Error('Google Translate API key is not configured');
   }
 
-  if (!text.trim()) {
-    return { translatedText: text };
+  
+  // Check glossary first for domain-specific terms
+  if (targetLanguage === 'zh-CN' || targetLanguage === 'zh') {
+    const key = text.trim().toLowerCase();
+    if (HAIR_FIBER_GLOSSARY_ZH[key]) {
+      return { translatedText: HAIR_FIBER_GLOSSARY_ZH[key] };
+    }
   }
 
   try {
