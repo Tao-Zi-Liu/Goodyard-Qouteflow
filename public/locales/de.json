@@ -176,5 +176,10 @@
   "dashboard_unassigned_tab": "Nicht zugewiesen",
   "dashboard_all_rfqs_tab_om": "Alle Anfragen",
   "purchaser_already_quoted": "Bereits angeboten",
-  "reassign_not_allowed": "Einkäufer, die bereits Angebote eingereicht haben, können nicht entfernt werden."
+  "reassign_not_allowed": "Einkäufer, die bereits Angebote eingereicht haben, können nicht entfernt werden.",
+  "button_customer_history": "Bestellhistorie",
+  "customer_history_dialog_title": "Bestellhistorie — {email}",
+  "customer_history_dialog_description": "Alle historischen Anfragen für diese E-Mail-Adresse",
+  "customer_history_empty": "Keine historischen Anfragen für diese E-Mail-Adresse gefunden",
+  "button_close": "Schließen"
 }

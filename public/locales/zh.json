@@ -232,5 +232,10 @@
   "inquiries_title": "询价单",
   "button_edit_rfq": "编辑询价单",
   "button_cancel_edit": "取消编辑",
-  "button_save_changes": "保存修改"
+  "button_save_changes": "保存修改",
+  "button_customer_history": "历史单据",
+  "customer_history_dialog_title": "历史单据 — {email}",
+  "customer_history_dialog_description": "该客户邮箱下的所有历史询价单",
+  "customer_history_empty": "该邮箱暂无历史询价单",
+  "button_close": "关闭"
 }

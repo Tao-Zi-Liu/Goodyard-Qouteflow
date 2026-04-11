@@ -232,5 +232,10 @@
   "inquiries_title": "Inquiries",
   "button_edit_rfq": "Edit RFQ" ,
   "button_cancel_edit": "Cancel Edit",
-  "button_save_changes": "Save Changes"
+  "button_save_changes": "Save Changes",
+  "button_customer_history": "Order History",
+  "customer_history_dialog_title": "Order History — {email}",
+  "customer_history_dialog_description": "All historical RFQs for this customer email",
+  "customer_history_empty": "No historical RFQs found for this email",
+  "button_close": "Close"
 }
