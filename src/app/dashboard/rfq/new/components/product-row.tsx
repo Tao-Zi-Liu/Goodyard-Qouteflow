@@ -38,6 +38,11 @@ const wlidPrefixMap: Record<ProductSeries, string> = {
   'Hair Patch': 'FTCP',
 };
 
+const wlidStartMap: Partial<Record<ProductSeries, number>> = {
+  Wig: 937,     // 新单从 FTCV0938 开始
+  Topper: 1770, // 新单从 FTCP1771 开始
+};
+
 export const generateWlid = async (productSeries: ProductSeries): Promise<string> => {
   const prefix = wlidPrefixMap[productSeries];
   let maxSuffix = 0;
@@ -57,6 +62,8 @@ export const generateWlid = async (productSeries: ProductSeries): Promise<string
   } catch (error) {
     console.error('Error generating WLID:', error);
   }
+  const minSuffix = wlidStartMap[productSeries] ?? 0;
+  if (maxSuffix < minSuffix) maxSuffix = minSuffix;
   return `${prefix}${(maxSuffix + 1).toString().padStart(4, '0')}`;
 };
 
