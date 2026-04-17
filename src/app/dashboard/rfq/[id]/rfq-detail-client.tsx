@@ -44,9 +44,18 @@ import { Copy } from 'lucide-react';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const formatFirestoreDate = (date: any): string => {
     if (!date) return 'N/A';
-    if (date.seconds) return new Date(date.seconds * 1000).toLocaleString();
+    // 🔧 FIX: 处理 Firestore Timestamp 对象（有 toDate 方法）
+    if (typeof date === 'object' && typeof date.toDate === 'function') {
+        try { return date.toDate().toLocaleString(); } catch { return 'N/A'; }
+    }
+    // 处理已经被序列化的 {seconds, nanoseconds} 对象
+    if (typeof date === 'object' && typeof date.seconds === 'number') {
+        return new Date(date.seconds * 1000).toLocaleString();
+    }
     if (date instanceof Date) return date.toLocaleString();
     if (typeof date === 'string') return new Date(date).toLocaleString();
+    // 🔧 FIX: 防御 FieldValue sentinel 或其他未知对象，避免 React 渲染时崩溃
+    if (typeof date === 'object') return 'Pending...';
     return 'N/A';
 };
 
@@ -293,16 +302,31 @@ export default function RFQDetailClient() {
             if (isUpdate) {
                 updatedQuotes = rfq.quotes.map(q =>
                     q.productId === productId && q.purchaserId === user.id
-                        ? { ...q, salesCostPriceRMB, salesCostPriceUSD, customizedProductPriceUSD, price: salesCostPriceRMB, priceUSD: salesCostPriceUSD, deliveryDate: deliveryDate.toISOString(), quoteTime: new Date().toISOString(), notes: message }
+                        ? { ...q, salesCostPriceRMB, 
+                            salesCostPriceUSD, 
+                            customizedProductPriceUSD, 
+                            price: salesCostPriceRMB, 
+                            priceUSD: salesCostPriceUSD, 
+                            deliveryDate: deliveryDate.toISOString(), 
+                            quoteTime: new Date().toISOString(), 
+                            notes: message || '' }
                         : q
                 );
             } else {
                 const newQuote: Quote = {
-                    id: `quote-${Date.now()}`, rfqId: rfq.id, productId, purchaserId: user.id,
-                    salesCostPriceRMB, salesCostPriceUSD, customizedProductPriceUSD,
-                    price: salesCostPriceRMB, priceUSD: salesCostPriceUSD,
-                    deliveryDate: deliveryDate.toISOString(), quoteTime: new Date().toISOString(),
-                    status: 'Pending Acceptance', notes: message
+                    id: `quote-${Date.now()}`,
+                    rfqId: rfq.id,
+                    productId,
+                    purchaserId: user.id,
+                    salesCostPriceRMB: salesCostPriceRMB ?? 0,
+                    salesCostPriceUSD: salesCostPriceUSD ?? 0,
+                    customizedProductPriceUSD: customizedProductPriceUSD ?? 0,
+                    price: salesCostPriceRMB ?? 0,
+                    priceUSD: salesCostPriceUSD ?? 0,
+                    deliveryDate: deliveryDate.toISOString(),
+                    quoteTime: new Date().toISOString(),
+                    status: 'Pending Acceptance',
+                    notes: message || '' 
                 };
                 updatedQuotes = [...rfq.quotes, newQuote];
             }
@@ -311,7 +335,9 @@ export default function RFQDetailClient() {
             if (rfq.status === 'Locked' && rfq.lockedBy === user.id) { updatedData.lockedBy = null; updatedData.lockedAt = null; }
 
             await updateDoc(doc(db, "rfqs", rfq.id), updatedData);
-            setRfq(prev => prev ? { ...prev, ...updatedData, status: 'Quotation in Progress' as RFQStatus } : null);
+            // 🔧 FIX: 不能把 serverTimestamp() sentinel 直接塞进 React state（会导致 React error #31）
+            const { lastUpdatedTime: _lut, ...stateSafeData } = updatedData;
+            setRfq(prev => prev ? { ...prev, ...stateSafeData, lastUpdatedTime: new Date().toISOString(), status: 'Quotation in Progress' as RFQStatus } : null);
 
             await addActionHistory(rfq.id, isUpdate ? 'quote_updated' : 'quote_submitted', {
                 productId, productName: rfq.products.find(p => p.id === productId)?.sku || '',
@@ -327,8 +353,14 @@ export default function RFQDetailClient() {
             });
 
             toast({ title: isUpdate ? "Quote Updated" : "Quote Submitted" });
-        } catch {
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit the quote.' });
+        } catch (error) {
+            console.error('🔴 Quote submit failed:', error);
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error', 
+                description: `Failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+            });
+            return; 
         }
     };
 
@@ -400,7 +432,9 @@ export default function RFQDetailClient() {
             };
 
             await updateDoc(doc(db, "rfqs", rfq.id), updatedData);
-            setRfq(prev => prev ? { ...prev, ...updatedData } : null);
+            // 🔧 FIX: 不能把 serverTimestamp() sentinel 直接塞进 React state（会导致 React error #31）
+            const { lastUpdatedTime: _lut2, ...stateSafeData } = updatedData;
+            setRfq(prev => prev ? { ...prev, ...stateSafeData, lastUpdatedTime: new Date().toISOString() } : null);
             setIsEditing(false);
             setEditingImages({});
 
