@@ -290,13 +290,34 @@ export default function RFQDetailClient() {
         }
     };
 
-    const handleQuoteSubmit = async (productId: string, price: number, deliveryDate: Date, message: string, existingQuote?: Quote) => {
+    const handleQuoteSubmit = async (
+        productId: string,
+        price: number,
+        deliveryDateFrom: Date | undefined,
+        deliveryDateTo: Date | undefined,
+        message: string,
+        existingQuote?: Quote
+    ) => {
         if (!rfq || !user) return;
+        // 🔧 FIX: 参数校验。至少要有一个日期
+        if (!deliveryDateFrom && !deliveryDateTo) {
+            toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please select at least one delivery date.' });
+            return;
+        }
+        if (typeof price !== 'number' || isNaN(price) || price <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid Price', description: 'Price must be a positive number.' });
+            return;
+        }
         try {
             const isUpdate = !!existingQuote;
             const salesCostPriceRMB = price;
             const salesCostPriceUSD = convertRMBToUSD(price);
             const customizedProductPriceUSD = calculateCustomizedPrice(price);
+            // 🔧 FIX: 两个日期字段都转成 ISO 字符串；兼容字段 deliveryDate 取 deliveryDateFrom（或 to 兜底）
+            const deliveryDateFromISO = deliveryDateFrom ? deliveryDateFrom.toISOString() : '';
+            const deliveryDateToISO = deliveryDateTo ? deliveryDateTo.toISOString() : '';
+            const deliveryDateISO = deliveryDateFromISO || deliveryDateToISO;
+            const safeMessage = (message ?? '').toString();
 
             let updatedQuotes: Quote[];
             if (isUpdate) {
@@ -307,9 +328,11 @@ export default function RFQDetailClient() {
                             customizedProductPriceUSD, 
                             price: salesCostPriceRMB, 
                             priceUSD: salesCostPriceUSD, 
-                            deliveryDate: deliveryDate.toISOString(), 
+                            deliveryDate: deliveryDateISO,
+                            deliveryDateFrom: deliveryDateFromISO,
+                            deliveryDateTo: deliveryDateToISO,
                             quoteTime: new Date().toISOString(), 
-                            notes: message || '' }
+                            notes: safeMessage }
                         : q
                 );
             } else {
@@ -323,12 +346,14 @@ export default function RFQDetailClient() {
                     customizedProductPriceUSD: customizedProductPriceUSD ?? 0,
                     price: salesCostPriceRMB ?? 0,
                     priceUSD: salesCostPriceUSD ?? 0,
-                    deliveryDate: deliveryDate.toISOString(),
+                    deliveryDate: deliveryDateISO,
+                    deliveryDateFrom: deliveryDateFromISO,
+                    deliveryDateTo: deliveryDateToISO,
                     quoteTime: new Date().toISOString(),
                     status: 'Pending Acceptance',
-                    notes: message || '' 
+                    notes: safeMessage 
                 };
-                updatedQuotes = [...rfq.quotes, newQuote];
+                updatedQuotes = [...(rfq.quotes || []), newQuote];
             }
 
             const updatedData: any = { quotes: updatedQuotes, status: 'Quotation in Progress' as RFQStatus, lastUpdatedTime: serverTimestamp() };
@@ -372,7 +397,7 @@ export default function RFQDetailClient() {
                 quoteTime: new Date().toISOString(), deliveryDate: '', status: 'Abandoned',
                 abandonmentReason: reason, abandonedAt: new Date().toISOString()
             };
-            const updatedQuotes = [...rfq.quotes.filter(q => !(q.productId === productId && q.purchaserId === user.id)), abandonedQuote];
+            const updatedQuotes = [...(rfq.quotes || []).filter(q => !(q.productId === productId && q.purchaserId === user.id)), abandonedQuote];
             const allAbandoned = rfq.products.every(p =>
                 rfq.assignedPurchaserIds.every(pId => updatedQuotes.find(q => q.productId === p.id && q.purchaserId === pId)?.status === 'Abandoned')
             );
