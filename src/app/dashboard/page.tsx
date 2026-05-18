@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { copyRfq } from '@/lib/copy-rfq';
+import { exportFinanceReport } from '@/lib/finance-export';
 import { Copy } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 // ─────────────────────────────────────────────────────────────────────────────
@@ -591,6 +592,7 @@ function DashboardContent() {
         user?.role === 'Sales' ? 'my_rfqs' :
         user?.role === 'Purchasing' ? 'my_quotes' :
         user?.role === 'Order Manager' ? 'unassigned' :
+        user?.role === 'Finance' ? 'finance_completed' :
         'all_rfqs'
     ));
     const [filters, setFilters] = useState<Filters>(() => ({
@@ -817,6 +819,12 @@ function DashboardContent() {
     const requiresMyQuote = applyFilters(rfqs.filter(rfq =>
         rfq.assignedPurchaserIds?.includes(user?.id || '') && rfq.status !== 'Quotation Completed'
     ));
+    const unassignedRfqs = applyFilters(rfqs.filter(rfq =>
+        !rfq.assignedPurchaserIds || rfq.assignedPurchaserIds.length === 0
+    ));
+    const financeVisibleRfqs = applyFilters(rfqs.filter(rfq =>
+        ['Quotation Completed', 'Sent', 'Closed', 'Archived'].includes(rfq.status)
+    ));
 
     const handleCopyRfq = async (rfq: RFQ) => {
         if (!user || user.role !== 'Sales') return;
@@ -860,6 +868,12 @@ function DashboardContent() {
                     </Button>
                     
                 )}
+                {user?.role === 'Finance' && (
+                    <Button onClick={() => exportFinanceReport(financeVisibleRfqs, allUsers)}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        {t('finance_export_excel')}
+                    </Button>
+                )}
 
             </div>
 
@@ -885,6 +899,7 @@ function DashboardContent() {
                 {user?.role === 'Sales' && <TabsTrigger value="my_rfqs">{t('dashboard_my_rfqs_tab')}</TabsTrigger>}
                 {user?.role === 'Purchasing' && <TabsTrigger value="my_quotes">{t('dashboard_my_quotes_tab')}</TabsTrigger>}
                 {user?.role === 'Order Manager' && <TabsTrigger value="unassigned">{t('dashboard_unassigned_tab')}</TabsTrigger>}
+                {user?.role === 'Finance' && <TabsTrigger value="finance_completed">{t('finance_dashboard_title')}</TabsTrigger>}
                 <TabsTrigger value="all_rfqs">{t('dashboard_all_rfqs_tab')}</TabsTrigger>
             </TabsList>
                 <Card className="mt-4">
@@ -905,6 +920,11 @@ function DashboardContent() {
                         {user?.role === 'Order Manager' && (
                             <TabsContent value="unassigned" className="m-0">
                                 <RFQTable data={unassignedRfqs} {...tableProps} />
+                            </TabsContent>
+                        )}
+                        {user?.role === 'Finance' && (
+                            <TabsContent value="finance_completed" className="m-0">
+                                <RFQTable data={financeVisibleRfqs} {...tableProps} />
                             </TabsContent>
                         )}
                     </CardContent>

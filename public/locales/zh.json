@@ -240,5 +240,11 @@
   "customer_history_dialog_title": "历史单据 — {email}",
   "customer_history_dialog_description": "该客户邮箱下的所有历史询价单",
   "customer_history_empty": "该邮箱暂无历史询价单",
-  "button_close": "关闭"
+  "button_close": "关闭",
+  "user_role_finance": "财务",
+  "finance_dashboard_title": "财务报表",
+  "finance_export_excel": "导出 Excel",
+  "finance_no_completed_rfqs": "暂无可查看的已完成询价单",
+  "header_rmb_cost": "人民币成本价",
+  "header_purchaser": "报价人"
 }

@@ -1,5 +1,5 @@
 
-export type UserRole = 'Admin' | 'Sales' | 'Purchasing' | 'Order Manager';
+export type UserRole = 'Admin' | 'Sales' | 'Purchasing' | 'Order Manager' | 'Finance';
 export type Language = 'en' | 'de' | 'zh';
 
 export interface User {

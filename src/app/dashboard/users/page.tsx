@@ -181,6 +181,7 @@ export default function UsersPage() {
             case 'Sales': return 'default';
             case 'Purchasing': return 'secondary';
             case 'Order Manager': return 'default';
+            case 'Finance': return 'secondary';
             default: return 'outline';
         }
     };
@@ -248,6 +249,7 @@ export default function UsersPage() {
                                         <SelectItem value="Sales">Sales</SelectItem>
                                         <SelectItem value="Purchasing">Purchasing</SelectItem>
                                         <SelectItem value="Order Manager">Order Manager</SelectItem>
+                                        <SelectItem value="Finance">Finance</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -240,5 +240,11 @@
   "customer_history_dialog_title": "Order History — {email}",
   "customer_history_dialog_description": "All historical RFQs for this customer email",
   "customer_history_empty": "No historical RFQs found for this email",
-  "button_close": "Close"
+  "button_close": "Close",
+  "user_role_finance": "Finance",
+  "finance_dashboard_title": "Finance Reports",
+  "finance_export_excel": "Export Excel",
+  "finance_no_completed_rfqs": "No completed RFQs available",
+  "header_rmb_cost": "RMB Cost Price",
+  "header_purchaser": "Purchaser"
 }

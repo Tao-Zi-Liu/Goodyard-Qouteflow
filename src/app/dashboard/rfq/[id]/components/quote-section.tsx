@@ -129,7 +129,7 @@ export function QuoteSection({
                                         <p className="text-lg font-bold text-orange-600">Quote Abandoned</p>
                                     ) : (
                                         <div className="space-y-1">
-                                            {userRole === 'Purchasing' ? (
+                                            {(userRole === 'Purchasing' || userRole === 'Finance' || userRole === 'Admin') ? (
                                                 <>
                                                     <p className="text-sm text-muted-foreground">Sales Cost Price:</p>
                                                     <p className="text-lg font-bold text-blue-600">
