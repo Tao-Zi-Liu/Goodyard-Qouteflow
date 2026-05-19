@@ -20,11 +20,14 @@ interface CreateUserData {
   databaseId?: string;
 }
 
+const firestoreClients = new Map<string, Firestore>();
+
 /**
  * Return a Firestore instance targeting the requested database.
  * Cache instances per-databaseId so we don't recreate clients on every call.
+ * @param {string} databaseId The Firestore database id, or "(default)".
+ * @return {Firestore} A Firestore client for that database.
  */
-const firestoreClients = new Map<string, Firestore>();
 function getDb(databaseId: string): Firestore {
   const key = databaseId || "(default)";
   let client = firestoreClients.get(key);
@@ -104,7 +107,8 @@ export const createUser = functions.https.onCall(
         role: role,
       });
       functions.logger.info(
-        `User created: ${email} (role=${role}) in database='${databaseId}' by ${request.auth.uid}`
+        `User created: ${email} (role=${role}) ` +
+        `in database='${databaseId}' by ${request.auth.uid}`
       );
       return {
         success: true,

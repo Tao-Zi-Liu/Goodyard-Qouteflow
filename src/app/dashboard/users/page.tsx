@@ -53,7 +53,7 @@ export default function UsersPage() {
             setLoading(true);
             const usersQuery = query(
                 collection(db, 'users'), 
-                orderBy('createdAt', 'desc')
+                orderBy('registrationDate', 'desc')
             );
             const userSnapshot = await getDocs(usersQuery);
             const userList = userSnapshot.docs.map(doc => {
@@ -142,7 +142,8 @@ export default function UsersPage() {
                 password: password,
                 name: formData.name,
                 role: formData.role,
-                language: formData.language
+                language: formData.language,
+                databaseId: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_ID || '(default)'
             });
 
             toast({
