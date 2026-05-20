@@ -1,4 +1,6 @@
 // Currency conversion utilities
+import type { CustomerGroup } from './types';
+
 export const USD_TO_RMB_RATE = 7.25;
 
 /**
@@ -9,11 +11,34 @@ export function convertRMBToUSD(rmbAmount: number): number {
 }
 
 /**
- * Calculate Customized Product Price in USD
- * Formula: (RMB ÷ 2.88 + 40) × 1.075 + 40
+ * Sale price formulas keyed by customer group.
+ * Add new groups here without touching any caller of calculateCustomizedPrice.
  */
-export function calculateCustomizedPrice(rmbAmount: number): number {
-  const result = (rmbAmount / 2.88 + 40) * 1.075 + 40;
+type PriceFormula = (rmbAmount: number) => number;
+
+const PRICE_FORMULAS: Record<CustomerGroup, PriceFormula> = {
+  // Standard customer: (RMB ÷ 2.88 + 40) × 1.075 + 40
+  standard: (rmb) => (rmb / 2.88 + 40) * 1.075 + 40,
+
+  // Class B customer (VIP / wholesale / long-term partner):
+  //   RMB ÷ 0.6 ÷ 6 + 40  (equivalent to RMB ÷ 3.6 + 40)
+  classB: (rmb) => rmb / 0.6 / 6 + 40,
+};
+
+/**
+ * Calculate Customized Product Price in USD.
+ *
+ * @param rmbAmount Raw RMB cost from purchasing.
+ * @param customerGroup Optional customer group; defaults to 'standard'
+ *                      for backward compatibility with legacy RFQs that
+ *                      do not have this field set.
+ */
+export function calculateCustomizedPrice(
+  rmbAmount: number,
+  customerGroup?: CustomerGroup
+): number {
+  const formula = PRICE_FORMULAS[customerGroup ?? 'standard'];
+  const result = formula(rmbAmount);
   return Math.round(result * 100) / 100;
 }
 

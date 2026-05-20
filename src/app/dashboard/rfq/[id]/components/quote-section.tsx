@@ -18,6 +18,7 @@ interface QuoteSectionProps {
     acceptedQuote: Quote | undefined;
     canSalesAccept: boolean;
     isUserAssigned: boolean;
+    customerGroup?: import('./types').CustomerGroup;
     userQuote: Quote | undefined;
     userRole: string | undefined;
     users: User[];
@@ -38,7 +39,7 @@ function needsTranslation(text: string, targetLang: string): boolean {
 
 export function QuoteSection({
     product, productQuotes, acceptedQuote, canSalesAccept, isUserAssigned,
-    userQuote, userRole, users, t,
+    userQuote, userRole, customerGroup, users, t,
     onAcceptQuote, onQuoteSubmit, onAbandonQuote
 }: QuoteSectionProps) {
     const { language } = useI18n();
@@ -212,7 +213,7 @@ export function QuoteSection({
 
             {userRole === 'Purchasing' && isUserAssigned && !acceptedQuote && !userQuote?.status?.includes('Abandoned') && (
                 <div className="mt-4 space-y-2">
-                    <QuoteDialog product={product} userQuote={userQuote} onQuoteSubmit={onQuoteSubmit}>
+                    <QuoteDialog product={product} userQuote={userQuote} customerGroup={customerGroup} onQuoteSubmit={onQuoteSubmit}>
                         <Button className="w-full" variant={userQuote ? 'outline' : 'default'}>
                             {userQuote
                                 ? <><Edit className="mr-2 h-4 w-4" /> {t('edit_your_quote')}</>

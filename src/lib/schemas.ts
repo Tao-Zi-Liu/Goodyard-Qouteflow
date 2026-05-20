@@ -33,6 +33,7 @@ const productSchema = z.object({
 export const rfqFormSchema = z.object({
   customerType: z.string(),
   customerEmail: z.string().email('Invalid email address'),
+  customerGroup: z.enum(['standard', 'classB']).optional(),
   assignedPurchaserIds: z.array(z.string()).min(1, 'At least one purchaser must be assigned'),
   products: z.array(productSchema).min(1, 'At least one product is required'),
 });

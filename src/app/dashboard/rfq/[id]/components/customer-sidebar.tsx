@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { RFQ, User } from './types';
+import type { RFQ, User, UserRole } from './types';
 import type { UseFormReturn } from 'react-hook-form';
 
 interface CustomerSidebarProps {
@@ -17,10 +17,11 @@ interface CustomerSidebarProps {
     purchasingUsers: User[];
     isEditing: boolean;
     editForm: UseFormReturn<any>;
+    currentUserRole?: UserRole;
     t: (key: string, params?: any) => string;
 }
 
-export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, editForm, t }: CustomerSidebarProps) {
+export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, editForm, currentUserRole, t }: CustomerSidebarProps) {
     return (
         <>
             {/* Customer & Creator */}
@@ -34,7 +35,12 @@ export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, edit
                             <div>
                                 <h4 className="font-semibold text-sm">{t('customer')}</h4>
                                 <p className="text-sm text-muted-foreground">{rfq.customerEmail}</p>
-                                <Badge variant="outline" className="mt-1">{rfq.customerType ? t(`customer_type_${rfq.customerType.toLowerCase()}`) : ''}</Badge>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                    <Badge variant="outline">{rfq.customerType ? t(`customer_type_${rfq.customerType.toLowerCase()}`) : ''}</Badge>
+                                    {rfq.customerGroup === 'classB' && (
+                                        <Badge variant="default">{t('customer_group_class_b')}</Badge>
+                                    )}
+                                </div>
                             </div>
                             <Separator />
                             {creator && (
@@ -79,6 +85,31 @@ export function CustomerSidebar({ rfq, creator, purchasingUsers, isEditing, edit
                                                 <SelectContent>
                                                 <SelectItem value="New">{t('customer_type_new')}</SelectItem>
                                                 <SelectItem value="Repeating">{t('customer_type_repeating')}</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={editForm.control}
+                                    name="customerGroup"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>{t('customer_group_label')}</FormLabel>
+                                            <Select
+                                                onValueChange={field.onChange}
+                                                value={field.value ?? 'standard'}
+                                                disabled={currentUserRole !== 'Admin'}
+                                            >
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder={t('customer_group_select_placeholder')} />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="standard">{t('customer_group_standard')}</SelectItem>
+                                                    <SelectItem value="classB">{t('customer_group_class_b')}</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                             <FormMessage />

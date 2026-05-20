@@ -1,6 +1,7 @@
 
 export type UserRole = 'Admin' | 'Sales' | 'Purchasing' | 'Order Manager' | 'Finance';
 export type Language = 'en' | 'de' | 'zh';
+export type CustomerGroup = 'standard' | 'classB';
 
 export interface User {
   id: string;
@@ -107,6 +108,7 @@ export interface RFQ {
   assignedPurchaserIds: string[];
   customerType: string;
   customerEmail: string;
+  customerGroup?: CustomerGroup;
   products: Product[];
   quotes: Quote[];
   archiveReason?: string;

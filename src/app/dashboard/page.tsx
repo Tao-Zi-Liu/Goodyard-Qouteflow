@@ -150,13 +150,14 @@ type Filters = {
     inquiryFrom: string; inquiryTo: string;
     lastUpdatedFrom: string; lastUpdatedTo: string;
     creatorId: string; sent: string; status: string;
+    customerGroup: string;
 };
 
 const emptyFilters: Filters = {
     code: '', customerType: '', customerEmail: '', refSku: '',
     color: '', length: '', salePriceMin: '', salePriceMax: '',
     inquiryFrom: '', inquiryTo: '', lastUpdatedFrom: '', lastUpdatedTo: '',
-    creatorId: '', sent: '', status: '',
+    creatorId: '', sent: '', status: '', customerGroup: '',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -291,7 +292,22 @@ const RFQTable = ({
                                 )}
                             </ColumnFilterHeader>
                         </TableHead>
-
+                        {/* Customer Group */}
+                        <TableHead>
+                            <ColumnFilterHeader label={t('customer_group_label')} isActive={!!filters.customerGroup}>
+                                <Select value={filters.customerGroup || 'all'} onValueChange={v => updateFilter('customerGroup', v === 'all' ? '' : v)}>
+                                    <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('all')} /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">{t('all')}</SelectItem>
+                                        <SelectItem value="standard">{t('customer_group_standard')}</SelectItem>
+                                        <SelectItem value="classB">{t('customer_group_class_b')}</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {filters.customerGroup && (
+                                    <Button variant="ghost" size="sm" className="w-full h-6 text-xs mt-1" onClick={() => clearFilter('customerGroup')}>{t('clear')}</Button>
+                                )}
+                            </ColumnFilterHeader>
+                        </TableHead>            
                         {/* Customer Email */}
                         <TableHead>
                             <ColumnFilterHeader label={t('field_customer_email')} isActive={!!filters.customerEmail}>
@@ -477,6 +493,11 @@ const RFQTable = ({
                                         </div>
                                     </TableCell>
                                     <TableCell>{rfq.customerType ? t(`customer_type_${rfq.customerType.toLowerCase()}`) : t('value_default')}</TableCell>
+                                    <TableCell>
+                                        {rfq.customerGroup === 'classB' 
+                                            ? <Badge variant="default" className="text-xs">{t('customer_group_class_b')}</Badge>
+                                            : <span className="text-muted-foreground text-xs">{t('customer_group_standard')}</span>}
+                                    </TableCell>
                                     <TableCell>{rfq.customerEmail || t('value_default')}</TableCell>
                                     <TableCell>{firstProduct?.sku || t('value_default')}</TableCell>
                                     <TableCell>
@@ -599,6 +620,7 @@ function DashboardContent() {
         code: searchParams.get('code') || '',
         customerType: searchParams.get('customerType') || '',
         customerEmail: searchParams.get('customerEmail') || '',
+        customerGroup: searchParams.get('customerGroup') || '',
         refSku: searchParams.get('refSku') || '',
         color: searchParams.get('color') || '',
         length: searchParams.get('length') || '',
@@ -808,6 +830,10 @@ function DashboardContent() {
             }
             if (filters.creatorId && rfq.creatorId !== filters.creatorId) return false;
             if (filters.status && rfq.status !== filters.status) return false;
+            if (filters.customerGroup) {
+                const effectiveGroup = rfq.customerGroup ?? 'standard';
+                if (effectiveGroup !== filters.customerGroup) return false;
+            }
             if (filters.sent === 'yes' && rfq.status !== 'Sent') return false;
             if (filters.sent === 'no' && rfq.status === 'Sent') return false;
             return true;

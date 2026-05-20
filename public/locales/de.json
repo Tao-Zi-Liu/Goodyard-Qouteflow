@@ -1,4 +1,3 @@
-
 {
   "app_title": "QuoteFlow",
   "dashboard_title": "Dashboard",
@@ -37,6 +36,10 @@
   "field_label_inquiry_time": "Anfragezeit",
   "field_customer_type": "Kundentyp",
   "field_customer_email": "Kunden-E-Mail",
+  "customer_group_label": "Kundengruppe",
+  "customer_group_standard": "Standard",
+  "customer_group_class_b": "Class B",
+  "customer_group_select_placeholder": "Kundengruppe auswählen",
   "assigned_purchasers": "Zugeordnete Einkäufer",
   "products": "Produkte",
   "quotes": "Angebote",
