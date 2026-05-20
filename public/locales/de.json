@@ -187,5 +187,6 @@
   "customer_history_dialog_title": "Bestellhistorie — {email}",
   "customer_history_dialog_description": "Alle historischen Anfragen für diese E-Mail-Adresse",
   "customer_history_empty": "Keine historischen Anfragen für diese E-Mail-Adresse gefunden",
-  "button_close": "Schließen"
+  "button_close": "Schließen",
+  "quote_sales_cost_price_label": "Einkaufspreis:"
 }

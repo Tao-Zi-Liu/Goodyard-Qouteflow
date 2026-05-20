@@ -250,5 +250,6 @@
   "finance_export_excel": "导出 Excel",
   "finance_no_completed_rfqs": "暂无可查看的已完成询价单",
   "header_rmb_cost": "人民币成本价",
-  "header_purchaser": "报价人"
+  "header_purchaser": "报价人",
+  "quote_sales_cost_price_label": "采购成本价:"
 }

@@ -132,7 +132,7 @@ export function QuoteSection({
                                         <div className="space-y-1">
                                             {(userRole === 'Purchasing' || userRole === 'Finance' || userRole === 'Admin') ? (
                                                 <>
-                                                    <p className="text-sm text-muted-foreground">Sales Cost Price:</p>
+                                                    <p className="text-sm text-muted-foreground">{t('quote_sales_cost_price_label')}</p>
                                                     <p className="text-lg font-bold text-blue-600">
                                                         {formatRMB(quote.salesCostPriceRMB || quote.price || 0)}
                                                     </p>

@@ -250,5 +250,6 @@
   "finance_export_excel": "Export Excel",
   "finance_no_completed_rfqs": "No completed RFQs available",
   "header_rmb_cost": "RMB Cost Price",
-  "header_purchaser": "Purchaser"
+  "header_purchaser": "Purchaser",
+  "quote_sales_cost_price_label": "Sales Cost Price:"
 }
