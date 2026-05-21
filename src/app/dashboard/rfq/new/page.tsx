@@ -93,7 +93,7 @@ export default function NewRfqPage() {
       }
     };
     fetchData();
-    generateWlid(defaultProductSeries).then(setDefaultWlid);
+    generateWlid(defaultProductSeries, 'standard').then(setDefaultWlid);
   }, []);
 
   const defaultValues: RfqFormValues = {
@@ -220,7 +220,8 @@ export default function NewRfqPage() {
   };
 
   const addProduct = async () => {
-    const newWlid = await generateWlid('Wig');
+    const currentGroup = form.getValues('customerGroup') ?? 'standard';
+    const newWlid = await generateWlid('Wig', currentGroup);
     append({
       id: `prod-${Date.now()}`,
       wlid: newWlid,
@@ -244,7 +245,7 @@ export default function NewRfqPage() {
     const populatedProducts = await Promise.all(
       products.map(async (p: any) => ({
         id: `prod-${Date.now()}-${Math.random()}`,
-        wlid: p.wlid || (await generateWlid(p.productSeries || defaultProductSeries)),
+        wlid: p.wlid || (await generateWlid(p.productSeries || defaultProductSeries, data.customerGroup ?? 'standard')),
         ...p,
       }))
     );
@@ -290,6 +291,7 @@ export default function NewRfqPage() {
                         onSimilarQuotesFound={handleSimilarQuotesFound}
                         updateProductImages={updateProductImages}
                         productId={form.watch(`products.${index}.id`) || field.id}
+                        customerGroup={form.watch("customerGroup")}
                         t={t}
                       />
                     ))}

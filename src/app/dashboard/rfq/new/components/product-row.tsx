@@ -25,26 +25,37 @@ import {
 } from '@/lib/product-form-configs';
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { ProductSeries, RFQ, Quote } from '@/lib/types';
+import type { ProductSeries, RFQ, Quote, CustomerGroup } from '@/lib/types';
 
 const productSeriesOptions: ProductSeries[] = ['Wig', 'Topper', 'Hair Patch'];
 
-const wlidPrefixMap: Record<ProductSeries, string> = {
-  Wig: 'FTCV',
-  'Hair Extension': 'FTCE',
-  Topper: 'FTCP',
-  Toupee: 'FTCU',
-  'Synthetic Product': 'FTCS',
-  'Hair Patch': 'FTCP',
+// WLID 前缀:第一维产品系列,第二维客户分组
+// Class B 客户使用独立前缀,序号空间也独立
+const wlidPrefixMap: Record<ProductSeries, Record<CustomerGroup, string>> = {
+  Wig:                 { standard: 'FTCV',  classB: 'FWCVS' },
+  'Hair Extension':    { standard: 'FTCE',  classB: 'FTCE'  },  // Class B 暂无独立前缀,先用 standard
+  Topper:              { standard: 'FTCP',  classB: 'FTCPS' },
+  Toupee:              { standard: 'FTCU',  classB: 'FTCU'  },  // 同上
+  'Synthetic Product': { standard: 'FTCS',  classB: 'FTCS'  },  // 同上
+  'Hair Patch':        { standard: 'FTCP',  classB: 'FTCPS' },  // 跟 Topper 共用
 };
 
-const wlidStartMap: Partial<Record<ProductSeries, number>> = {
-  Wig: 937,     // 新单从 FTCV0938 开始
-  Topper: 1770, // 新单从 FTCP1771 开始
+// WLID 起始号:lastUsed,下一个就是 +1
+// 例:Wig standard 起始 937 表示下一个新单是 FTCV0938
+const wlidStartMap: Record<ProductSeries, Partial<Record<CustomerGroup, number>>> = {
+  Wig:                 { standard: 937,  classB: 0    },   // standard: FTCV0938 起;classB: FWCVS0001 起
+  'Hair Extension':    {},
+  Topper:              { standard: 1770, classB: 217  },   // standard: FTCP1771 起;classB: FTCPS0218 起
+  Toupee:              {},
+  'Synthetic Product': {},
+  'Hair Patch':        { standard: 1770, classB: 217  },   // 跟 Topper 共用号段
 };
 
-export const generateWlid = async (productSeries: ProductSeries): Promise<string> => {
-  const prefix = wlidPrefixMap[productSeries];
+export const generateWlid = async (
+  productSeries: ProductSeries,
+  customerGroup: CustomerGroup = 'standard'
+): Promise<string> => {
+  const prefix = wlidPrefixMap[productSeries][customerGroup];
   let maxSuffix = 0;
   try {
     const rfqsSnapshot = await getDocs(collection(db, 'rfqs'));
@@ -53,7 +64,10 @@ export const generateWlid = async (productSeries: ProductSeries): Promise<string
       if (rfqData.products) {
         rfqData.products.forEach(product => {
           if (product.wlid && product.wlid.startsWith(prefix)) {
-            const suffix = parseInt(product.wlid.substring(prefix.length), 10);
+            const after = product.wlid.substring(prefix.length);
+            // 严格:prefix 后必须是纯数字。避免 FTCP 误匹配 FTCPS0218(S0218 不是纯数字)
+            if (!/^\d+$/.test(after)) return;
+            const suffix = parseInt(after, 10);
             if (!isNaN(suffix) && suffix > maxSuffix) maxSuffix = suffix;
           }
         });
@@ -62,7 +76,7 @@ export const generateWlid = async (productSeries: ProductSeries): Promise<string
   } catch (error) {
     console.error('Error generating WLID:', error);
   }
-  const minSuffix = wlidStartMap[productSeries] ?? 0;
+  const minSuffix = wlidStartMap[productSeries]?.[customerGroup] ?? 0;
   if (maxSuffix < minSuffix) maxSuffix = minSuffix;
   return `${prefix}${(maxSuffix + 1).toString().padStart(4, '0')}`;
 };
@@ -75,6 +89,7 @@ interface ProductRowProps {
   onSimilarQuotesFound: (quotes: Quote[]) => void;
   updateProductImages: (productId: string, files: File[]) => void;
   productId: string;
+  customerGroup?: CustomerGroup;
   t: (key: string) => string;
 }
 
@@ -85,6 +100,7 @@ export function ProductRow({
   setValue,
   updateProductImages,
   productId,
+  customerGroup,
   t,
 }: ProductRowProps) {
   const productData = useWatch({ control, name: `products.${index}` });
@@ -93,11 +109,11 @@ export function ProductRow({
 
   useEffect(() => {
     if (productData?.productSeries) {
-      generateWlid(productData.productSeries).then(newWlid => {
+      generateWlid(productData.productSeries, customerGroup).then(newWlid => {
         setValue(`products.${index}.wlid`, newWlid, { shouldValidate: true });
       });
     }
-  }, [productData?.productSeries, index, setValue]);
+  }, [productData?.productSeries, customerGroup, index, setValue]);
 
   const removeImage = (imageIndex: number) => {
     const updated = selectedImages.filter((_, i) => i !== imageIndex);
