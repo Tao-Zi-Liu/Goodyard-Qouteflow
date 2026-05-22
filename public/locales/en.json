@@ -251,5 +251,7 @@
   "finance_no_completed_rfqs": "No completed RFQs available",
   "header_rmb_cost": "RMB Cost Price",
   "header_purchaser": "Purchaser",
-  "quote_sales_cost_price_label": "Sales Cost Price:"
+  "quote_sales_cost_price_label": "Sales Cost Price:",
+  "login_error_no_profile_title": "Account Not Provisioned",
+  "login_error_no_profile_desc": "Login succeeded but no account profile was found. Please contact your administrator."
 }

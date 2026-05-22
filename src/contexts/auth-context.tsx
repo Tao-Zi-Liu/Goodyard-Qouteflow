@@ -97,28 +97,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   localStorage.setItem('lang', userData.language);
                 }
               } else {
-                // Create user document if it doesn't exist
-                const newUserData = {
-                  email: firebaseUser.email,
-                  name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
-                  role: 'Sales',
-                  registrationDate: new Date().toISOString(),
-                  status: 'Active',
-                  language: 'en',
-                  avatar: 'https://placehold.co/100x100',
-                  lastLoginTime: new Date().toISOString()
-                };
-                
-                await setDoc(doc(db, 'users', firebaseUser.uid), newUserData);
-                
-                // Fetch the user data again
-                const createdUserData = await getUserData(firebaseUser);
-                if (createdUserData) {
-                  setUser(createdUserData);
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('user', JSON.stringify(createdUserData));
-                    localStorage.setItem('lang', createdUserData.language);
-                  }
+                // SAFETY: never auto-create user docs on login.
+                // Missing doc means either Firestore read failed (transient: network/rules/databaseId)
+                // OR user was never provisioned. In neither case should we overwrite with role='Sales'.
+                // This was the root cause of the Purchasing -> Sales data corruption incidents.
+                console.error('User authenticated but no Firestore profile found, signing out.', firebaseUser.uid);
+                await signOut(auth);
+                setUser(null);
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('user');
+                  localStorage.removeItem('lang');
                 }
               }
             } else {
@@ -172,25 +160,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
       
       if (!userData) {
-        // Create user document if it doesn't exist
-        const newUserData = {
-          email: userCredential.user.email,
-          name: userCredential.user.displayName || userCredential.user.email?.split('@')[0] || 'User',
-          role: 'Sales',
-          registrationDate: new Date().toISOString(),
-          status: 'Active',
-          language: 'en',
-          avatar: 'https://placehold.co/100x100',
-          lastLoginTime: new Date().toISOString()
-        };
-        
-        await setDoc(doc(db, 'users', userCredential.user.uid), newUserData);
-      } else {
-        // Update last login time
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
-          lastLoginTime: new Date().toISOString()
-        }, { merge: true });
+        // SAFETY: never auto-create user docs. See onAuthStateChanged comment above.
+        await signOut(auth);
+        throw new Error('USER_PROFILE_NOT_FOUND');
       }
+      // Update last login time (safe: explicit merge:true preserves all other fields)
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        lastLoginTime: new Date().toISOString()
+      }, { merge: true });
       
       // The onAuthStateChanged listener will handle setting the user state
       return true;
