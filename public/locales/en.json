@@ -240,5 +240,7 @@
   "customer_history_dialog_title": "Order History — {email}",
   "customer_history_dialog_description": "All historical RFQs for this customer email",
   "customer_history_empty": "No historical RFQs found for this email",
-  "button_close": "Close"
+  "button_close": "Close",
+  "login_error_no_profile_title": "Account Not Provisioned",
+  "login_error_no_profile_desc": "Login succeeded but no account profile was found. Please contact your administrator."
 }

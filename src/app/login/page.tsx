@@ -57,6 +57,12 @@ export default function LoginPage() {
           title: "账号已停用",
           description: "该账号已经停用，请联系管理员！",
         });
+      } else if (error?.message === 'USER_PROFILE_NOT_FOUND') {
+        toast({
+          variant: "destructive",
+          title: t('login_error_no_profile_title'),
+          description: t('login_error_no_profile_desc'),
+        });
       } else {
         toast({
           variant: "destructive",

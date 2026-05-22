@@ -240,5 +240,7 @@
   "customer_history_dialog_title": "历史单据 — {email}",
   "customer_history_dialog_description": "该客户邮箱下的所有历史询价单",
   "customer_history_empty": "该邮箱暂无历史询价单",
-  "button_close": "关闭"
+  "button_close": "关闭",
+  "login_error_no_profile_title": "账号未配置",
+  "login_error_no_profile_desc": "登录成功但未找到账号信息，请联系管理员开通权限。"
 }

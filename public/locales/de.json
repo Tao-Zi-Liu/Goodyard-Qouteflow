@@ -184,5 +184,7 @@
   "customer_history_dialog_title": "Bestellhistorie — {email}",
   "customer_history_dialog_description": "Alle historischen Anfragen für diese E-Mail-Adresse",
   "customer_history_empty": "Keine historischen Anfragen für diese E-Mail-Adresse gefunden",
-  "button_close": "Schließen"
+  "button_close": "Schließen",
+  "login_error_no_profile_title": "Konto nicht eingerichtet",
+  "login_error_no_profile_desc": "Anmeldung erfolgreich, aber kein Kontoprofil gefunden. Bitte wenden Sie sich an Ihren Administrator."
 }
