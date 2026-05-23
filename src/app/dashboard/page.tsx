@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { copyRfq } from '@/lib/copy-rfq';
+import { exportFinanceReport } from '@/lib/finance-export';
 import { Copy } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 // ─────────────────────────────────────────────────────────────────────────────
@@ -149,13 +150,14 @@ type Filters = {
     inquiryFrom: string; inquiryTo: string;
     lastUpdatedFrom: string; lastUpdatedTo: string;
     creatorId: string; sent: string; status: string;
+    customerGroup: string;
 };
 
 const emptyFilters: Filters = {
     code: '', customerType: '', customerEmail: '', refSku: '',
     color: '', length: '', salePriceMin: '', salePriceMax: '',
     inquiryFrom: '', inquiryTo: '', lastUpdatedFrom: '', lastUpdatedTo: '',
-    creatorId: '', sent: '', status: '',
+    creatorId: '', sent: '', status: '', customerGroup: '',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,7 +292,22 @@ const RFQTable = ({
                                 )}
                             </ColumnFilterHeader>
                         </TableHead>
-
+                        {/* Customer Group */}
+                        <TableHead>
+                            <ColumnFilterHeader label={t('customer_group_label')} isActive={!!filters.customerGroup}>
+                                <Select value={filters.customerGroup || 'all'} onValueChange={v => updateFilter('customerGroup', v === 'all' ? '' : v)}>
+                                    <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('all')} /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">{t('all')}</SelectItem>
+                                        <SelectItem value="standard">{t('customer_group_standard')}</SelectItem>
+                                        <SelectItem value="classB">{t('customer_group_class_b')}</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {filters.customerGroup && (
+                                    <Button variant="ghost" size="sm" className="w-full h-6 text-xs mt-1" onClick={() => clearFilter('customerGroup')}>{t('clear')}</Button>
+                                )}
+                            </ColumnFilterHeader>
+                        </TableHead>            
                         {/* Customer Email */}
                         <TableHead>
                             <ColumnFilterHeader label={t('field_customer_email')} isActive={!!filters.customerEmail}>
@@ -476,6 +493,11 @@ const RFQTable = ({
                                         </div>
                                     </TableCell>
                                     <TableCell>{rfq.customerType ? t(`customer_type_${rfq.customerType.toLowerCase()}`) : t('value_default')}</TableCell>
+                                    <TableCell>
+                                        {rfq.customerGroup === 'classB' 
+                                            ? <Badge variant="default" className="text-xs">{t('customer_group_class_b')}</Badge>
+                                            : <span className="text-muted-foreground text-xs">{t('customer_group_standard')}</span>}
+                                    </TableCell>
                                     <TableCell>{rfq.customerEmail || t('value_default')}</TableCell>
                                     <TableCell>{firstProduct?.sku || t('value_default')}</TableCell>
                                     <TableCell>
@@ -591,12 +613,14 @@ function DashboardContent() {
         user?.role === 'Sales' ? 'my_rfqs' :
         user?.role === 'Purchasing' ? 'my_quotes' :
         user?.role === 'Order Manager' ? 'unassigned' :
+        user?.role === 'Finance' ? 'finance_completed' :
         'all_rfqs'
     ));
     const [filters, setFilters] = useState<Filters>(() => ({
         code: searchParams.get('code') || '',
         customerType: searchParams.get('customerType') || '',
         customerEmail: searchParams.get('customerEmail') || '',
+        customerGroup: searchParams.get('customerGroup') || '',
         refSku: searchParams.get('refSku') || '',
         color: searchParams.get('color') || '',
         length: searchParams.get('length') || '',
@@ -806,6 +830,10 @@ function DashboardContent() {
             }
             if (filters.creatorId && rfq.creatorId !== filters.creatorId) return false;
             if (filters.status && rfq.status !== filters.status) return false;
+            if (filters.customerGroup) {
+                const effectiveGroup = rfq.customerGroup ?? 'standard';
+                if (effectiveGroup !== filters.customerGroup) return false;
+            }
             if (filters.sent === 'yes' && rfq.status !== 'Sent') return false;
             if (filters.sent === 'no' && rfq.status === 'Sent') return false;
             return true;
@@ -816,6 +844,12 @@ function DashboardContent() {
     const myRfqs = applyFilters(rfqs.filter(rfq => rfq.creatorId === user?.id));
     const requiresMyQuote = applyFilters(rfqs.filter(rfq =>
         rfq.assignedPurchaserIds?.includes(user?.id || '') && rfq.status !== 'Quotation Completed'
+    ));
+    const unassignedRfqs = applyFilters(rfqs.filter(rfq =>
+        !rfq.assignedPurchaserIds || rfq.assignedPurchaserIds.length === 0
+    ));
+    const financeVisibleRfqs = applyFilters(rfqs.filter(rfq =>
+        ['Quotation Completed', 'Sent', 'Closed', 'Archived'].includes(rfq.status)
     ));
 
     const handleCopyRfq = async (rfq: RFQ) => {
@@ -860,6 +894,12 @@ function DashboardContent() {
                     </Button>
                     
                 )}
+                {user?.role === 'Finance' && (
+                    <Button onClick={() => exportFinanceReport(financeVisibleRfqs, allUsers)}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        {t('finance_export_excel')}
+                    </Button>
+                )}
 
             </div>
 
@@ -885,6 +925,7 @@ function DashboardContent() {
                 {user?.role === 'Sales' && <TabsTrigger value="my_rfqs">{t('dashboard_my_rfqs_tab')}</TabsTrigger>}
                 {user?.role === 'Purchasing' && <TabsTrigger value="my_quotes">{t('dashboard_my_quotes_tab')}</TabsTrigger>}
                 {user?.role === 'Order Manager' && <TabsTrigger value="unassigned">{t('dashboard_unassigned_tab')}</TabsTrigger>}
+                {user?.role === 'Finance' && <TabsTrigger value="finance_completed">{t('finance_dashboard_title')}</TabsTrigger>}
                 <TabsTrigger value="all_rfqs">{t('dashboard_all_rfqs_tab')}</TabsTrigger>
             </TabsList>
                 <Card className="mt-4">
@@ -905,6 +946,11 @@ function DashboardContent() {
                         {user?.role === 'Order Manager' && (
                             <TabsContent value="unassigned" className="m-0">
                                 <RFQTable data={unassignedRfqs} {...tableProps} />
+                            </TabsContent>
+                        )}
+                        {user?.role === 'Finance' && (
+                            <TabsContent value="finance_completed" className="m-0">
+                                <RFQTable data={financeVisibleRfqs} {...tableProps} />
                             </TabsContent>
                         )}
                     </CardContent>

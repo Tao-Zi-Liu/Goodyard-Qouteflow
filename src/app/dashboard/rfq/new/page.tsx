@@ -93,12 +93,13 @@ export default function NewRfqPage() {
       }
     };
     fetchData();
-    generateWlid(defaultProductSeries).then(setDefaultWlid);
+    generateWlid(defaultProductSeries, 'standard').then(setDefaultWlid);
   }, []);
 
   const defaultValues: RfqFormValues = {
     customerType: 'New',
     customerEmail: '',
+    customerGroup: 'standard',
     assignedPurchaserIds: [],
     products: [{
       id: `prod-${Date.now()}`,
@@ -152,6 +153,7 @@ export default function NewRfqPage() {
         rfqCode: newRfqCode,
         customerType: formData.customerType,
         customerEmail: formData.customerEmail,
+        customerGroup: formData.customerGroup ?? 'standard',
         assignedPurchaserIds: formData.assignedPurchaserIds,
         products: [],
         inquiryTime: serverTimestamp(),
@@ -218,7 +220,8 @@ export default function NewRfqPage() {
   };
 
   const addProduct = async () => {
-    const newWlid = await generateWlid('Wig');
+    const currentGroup = form.getValues('customerGroup') ?? 'standard';
+    const newWlid = await generateWlid('Wig', currentGroup);
     append({
       id: `prod-${Date.now()}`,
       wlid: newWlid,
@@ -242,7 +245,7 @@ export default function NewRfqPage() {
     const populatedProducts = await Promise.all(
       products.map(async (p: any) => ({
         id: `prod-${Date.now()}-${Math.random()}`,
-        wlid: p.wlid || (await generateWlid(p.productSeries || defaultProductSeries)),
+        wlid: p.wlid || (await generateWlid(p.productSeries || defaultProductSeries, data.customerGroup ?? 'standard')),
         ...p,
       }))
     );
@@ -288,6 +291,7 @@ export default function NewRfqPage() {
                         onSimilarQuotesFound={handleSimilarQuotesFound}
                         updateProductImages={updateProductImages}
                         productId={form.watch(`products.${index}.id`) || field.id}
+                        customerGroup={form.watch("customerGroup")}
                         t={t}
                       />
                     ))}
@@ -356,6 +360,31 @@ export default function NewRfqPage() {
                             {t('button_customer_history')}
                             </Button>
                           </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    {/* Customer Group Select */}
+                    <FormField
+                      control={form.control}
+                      name="customerGroup"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('customer_group_label')}</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value ?? 'standard'}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder={t('customer_group_select_placeholder')} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="standard">{t('customer_group_standard')}</SelectItem>
+                              <SelectItem value="classB">{t('customer_group_class_b')}</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}

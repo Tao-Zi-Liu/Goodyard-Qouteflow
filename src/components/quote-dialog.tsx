@@ -13,15 +13,17 @@ import { cn } from '@/lib/utils';
 import type { Product, Quote } from '@/lib/types';
 import { convertRMBToUSD, calculateCustomizedPrice, formatRMB, formatUSD } from '@/lib/currency';
 import { useI18n } from '@/hooks/use-i18n';
+import type { CustomerGroup } from '@/lib/types';
 
 interface QuoteDialogProps {
   children: React.ReactNode;
   product: Product;
   userQuote?: Quote;
+  customerGroup?: CustomerGroup;
   onQuoteSubmit: (productId: string, price: number, deliveryDateFrom: Date | undefined, deliveryDateTo: Date | undefined, message: string, existingQuote?: Quote) => Promise<void>;
 }
 
-export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: QuoteDialogProps) {
+export function QuoteDialog({ children, product, userQuote, customerGroup,onQuoteSubmit }: QuoteDialogProps) {
   const [open, setOpen] = useState(false);
   const [price, setPrice] = useState(
     userQuote?.salesCostPriceRMB?.toString() || userQuote?.price?.toString() || ''
@@ -61,7 +63,7 @@ export function QuoteDialog({ children, product, userQuote, onQuoteSubmit }: Quo
 
   const rmbPrice = price && !isNaN(Number(price)) ? Number(price) : 0;
   const salesCostUSD = rmbPrice > 0 ? convertRMBToUSD(rmbPrice) : 0;
-  const customizedPriceUSD = rmbPrice > 0 ? calculateCustomizedPrice(rmbPrice) : 0;
+  const customizedPriceUSD = rmbPrice > 0 ? calculateCustomizedPrice(rmbPrice, customerGroup) : 0;
 
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {

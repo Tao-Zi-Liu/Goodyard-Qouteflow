@@ -81,7 +81,7 @@ export default function RFQDetailClient() {
 
     const editForm = useForm({
         resolver: zodResolver(rfqFormSchema),
-        defaultValues: { customerType: '', customerEmail: '', assignedPurchaserIds: [], products: [] }
+        defaultValues: { customerType: '', customerEmail: '', customerGroup: 'standard', assignedPurchaserIds: [], products: [] }
     });
         // handleAddComment — 提交时翻译三语存入 Firestore
         const handleAddComment = async (productId: string, content: string) => {
@@ -183,6 +183,7 @@ export default function RFQDetailClient() {
                     editForm.reset({
                         customerType: rfqData.customerType,
                         customerEmail: rfqData.customerEmail,
+                        customerGroup: rfqData.customerGroup ?? 'standard',
                         assignedPurchaserIds: rfqData.assignedPurchaserIds,
                         products: rfqData.products.map(p => ({ ...p, imageFiles: [] }))
                     });
@@ -312,7 +313,7 @@ export default function RFQDetailClient() {
             const isUpdate = !!existingQuote;
             const salesCostPriceRMB = price;
             const salesCostPriceUSD = convertRMBToUSD(price);
-            const customizedProductPriceUSD = calculateCustomizedPrice(price);
+            const customizedProductPriceUSD = calculateCustomizedPrice(price,rfq.customerGroup);
             // 🔧 FIX: 两个日期字段都转成 ISO 字符串；兼容字段 deliveryDate 取 deliveryDateFrom（或 to 兜底）
             const deliveryDateFromISO = deliveryDateFrom ? deliveryDateFrom.toISOString() : '';
             const deliveryDateToISO = deliveryDateTo ? deliveryDateTo.toISOString() : '';
@@ -449,6 +450,7 @@ export default function RFQDetailClient() {
             const updatedData = {
                 customerType: formData.customerType,
                 customerEmail: formData.customerEmail,
+                customerGroup: formData.customerGroup ?? 'standard',
                 assignedPurchaserIds: formData.assignedPurchaserIds,
                 products: updatedProducts,
                 updatedAt: new Date().toISOString(),
@@ -710,6 +712,7 @@ export default function RFQDetailClient() {
                                         isUserAssigned={isUserAssigned}
                                         userQuote={userQuote}
                                         userRole={user?.role}
+                                        customerGroup={rfq.customerGroup}
                                         users={users}
                                         t={t}
                                         onAcceptQuote={handleAcceptQuote}
@@ -738,6 +741,7 @@ export default function RFQDetailClient() {
                         purchasingUsers={purchasingUsers}
                         isEditing={isEditing}
                         editForm={editForm}
+                        currentUserRole={user?.role}
                         t={t}
                     />
                     <ActionHistorySection rfq={rfq} t={t} />
@@ -753,6 +757,7 @@ export default function RFQDetailClient() {
                         editForm.reset({
                             customerType: rfq.customerType,
                             customerEmail: rfq.customerEmail,
+                            customerGroup: rfq.customerGroup ?? 'standard',
                             assignedPurchaserIds: rfq.assignedPurchaserIds,
                             products: rfq.products.map(p => ({ ...p, imageFiles: [] }))
                         });
