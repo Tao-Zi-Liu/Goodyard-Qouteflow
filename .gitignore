@@ -50,3 +50,4 @@ firestore-debug.log
 *.bak2
 .env.staging
 .env.production
+serviceAccountKey.json
